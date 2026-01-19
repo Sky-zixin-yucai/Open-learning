@@ -1,0 +1,15 @@
+# 学习\python网络爬虫\ppcc-3-1.py
+
+/常见的Content-Encoding值
+编码  /	    Python库	说明
+gzip	    gzip	    标准库支持
+deflate	    zlib	    标准库支持
+br	        brotli	    需要安装 pip install brotli
+compress	无	        LZW压缩 Python不支持
+# =======================================
+# 1. 创建虚拟环境（如果需要）
+python -m venv venv
+.\venv\Scripts\activate
+# ---------------------------------------
+pip install brotli # 学习\python网络爬虫\ppcc-3-1.py
+# =======================================
