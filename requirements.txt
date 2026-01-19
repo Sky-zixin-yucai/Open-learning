@@ -13,3 +13,23 @@ python -m venv venv
 # ---------------------------------------
 pip install brotli # 学习\python网络爬虫\ppcc-3-1.py
 # =======================================
+
+## ——————————————————项目区分———————————————————————————————————— ##
+
+# 学习\python旋转目标检测\dota-0.py系列
+# 学习\python旋转目标检测\ddoo1.py系列.py系列
+# =======================================
+# 1. 创建虚拟环境（如果需要）
+python -m venv venv
+.\venv\Scripts\activate
+# ---------------------------------------
+# 安装两个包
+pip install opencv-python numpy
+
+# 或分别安装
+pip install opencv-python
+pip install numpy
+
+# 使用清华镜像加速（国内用户推荐）
+pip install opencv-python numpy -i https://pypi.tuna.tsinghua.edu.cn/simple
+# =======================================
