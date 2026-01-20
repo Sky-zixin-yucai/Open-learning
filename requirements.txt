@@ -33,3 +33,65 @@ pip install numpy
 # 使用清华镜像加速（国内用户推荐）
 pip install opencv-python numpy -i https://pypi.tuna.tsinghua.edu.cn/simple
 # =======================================
+
+## ——————————————————项目区分———————————————————————————————————— ##
+
+# 学习\Rule-Governed Architecture
+# =====================================================================
+# 分层依赖指南 | Tiered Dependencies Guide
+# 请根据您的目标选择 ONE 个部分执行 | Choose and follow ONE block only.
+# =====================================================================
+
+# 1. 纯CPU环境 | Python-Only Environment (CPU)
+# 目标: 无GPU的笔记本或服务器，仅运行核心逻辑。
+# Purpose: For environments WITHOUT an NVIDIA GPU (e.g., laptop CPU).
+
+# 安装步骤 | Installation:
+# 1. python -m venv venv && source venv/bin/activate (Linux/macOS)
+#    python -m venv venv && .\venv\Scripts\activate (Windows)
+# 2. 安装CPU版PyTorch | Install PyTorch for CPU:
+pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+# 3. 安装纯Python依赖 | Install pure-Python dependencies:
+pip install accelerate==1.10.1 blinker==1.9.0 certifi==2025.8.3 charset-normalizer==3.4.3 click==8.3.0 colorama==0.4.6 contourpy==1.3.3 cycler==0.12.1 einops==0.8.1 filelock==3.20.0 Flask==2.3.3 Flask-Cors==4.0.0 fonttools==4.60.1 fsspec==2025.9.0 hf_transfer==0.1.9 huggingface-hub==0.35.3 idna==3.10 itsdangerous==2.2.0 jieba==0.42.1 Jinja2==3.1.6 joblib==1.5.2 kiwisolver==1.4.9 MarkupSafe==3.0.2 matplotlib==3.10.7 mpmath==1.3.0 narwhals==2.11.0 networkx==3.5 numpy==2.3.3 packaging==25.0 pandas==2.3.3 pillow==11.3.0 plotly==6.4.0 protobuf==6.32.1 psutil==7.1.0 pyparsing==3.2.5 python-dateutil==2.9.0.post0 pytz==2025.2 PyYAML==6.0.3 regex==2025.9.18 requests==2.32.5 safetensors==0.6.2 six==1.17.0 sympy==1.14.0 threadpoolctl==3.6.0 tiktoken==0.12.0 tqdm==4.67.1 transformers==4.57.0 transformers-stream-generator==0.0.5 typing_extensions==4.15.0 tzdata==2025.2 urllib3==2.5.0 Werkzeug==3.1.3 -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 升级方法 | Upgrade:
+# pip install --upgrade [包列表，无版本号] -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# ---------------------------------------------------------------------
+
+# 2. GPU最低环境 | Minimum GPU Environment
+# 目标: 拥有NVIDIA GPU，仅安装运行必需的最少依赖。
+# Purpose: For NVIDIA GPU users, install only the essential dependencies to run.
+
+# 安装步骤 | Installation:
+# 1. 创建并激活虚拟环境（同上）| Create and activate virtual environment (same as above).
+# 2. 安装匹配CUDA的PyTorch | Install PyTorch matching your CUDA version:
+#    关键：运行 `nvidia-smi` 查看CUDA版本（如12.1），将下方 `cu128` 替换为 `cu121`
+#    Key: Run `nvidia-smi` to check CUDA Version (e.g., 12.1), replace `cu128` with `cu121` below.
+pip install torch==2.8.0+cu128 torchvision==0.23.0+cu128 torchaudio==2.8.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+# 3. 安装核心GPU依赖 | Install core GPU dependencies:
+pip install accelerate==1.10.1 einops==0.8.1 filelock==3.20.0 huggingface-hub==0.35.3 numpy==2.3.3 safetensors==0.6.2 tqdm==4.67.1 transformers==4.57.0 -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 升级方法 | Upgrade:
+# - PyTorch: 访问 https://pytorch.org/get-started/locally/ 获取最新命令。
+# - Others: pip install --upgrade <package_name>
+
+# ---------------------------------------------------------------------
+
+# 3. 完整环境 | Full-Feature Environment
+# 目标: 安装全部依赖，启用所有功能（数据科学、可视化、Web服务等）。
+# Purpose: Install ALL dependencies to enable every feature.
+
+# 安装步骤 | Installation:
+# 1. 创建并激活虚拟环境（同上）| Create and activate virtual environment (same as above).
+# 2. 【关键选择】根据有无GPU选择PyTorch命令 | 【Key Choice】Choose PyTorch command:
+#    A) 有NVIDIA GPU：使用“第2部分”的PyTorch安装命令。
+#       With NVIDIA GPU: Use the PyTorch command from "Part 2".
+#    B) 无GPU：使用“第1部分”的CPU版PyTorch命令。
+#       Without GPU: Use the CPU PyTorch command from "Part 1".
+# 3. 安装所有其他依赖 | Install ALL other dependencies:
+pip install accelerate==1.10.1 blinker==1.9.0 certifi==2025.8.3 charset-normalizer==3.4.3 click==8.3.0 colorama==0.4.6 contourpy==1.3.3 cycler==0.12.1 einops==0.8.1 filelock==3.20.0 Flask==2.3.3 Flask-Cors==4.0.0 fonttools==4.60.1 fsspec==2025.9.0 hf_transfer==0.1.9 huggingface-hub==0.35.3 idna==3.10 itsdangerous==2.2.0 jieba==0.42.1 Jinja2==3.1.6 joblib==1.5.2 kiwisolver==1.4.9 MarkupSafe==3.0.2 matplotlib==3.10.7 modelscope==1.30.0 mpmath==1.3.0 narwhals==2.11.0 networkx==3.5 numpy==2.3.3 packaging==25.0 pandas==2.3.3 pillow==11.3.0 plotly==6.4.0 protobuf==6.32.1 psutil==7.1.0 pyparsing==3.2.5 python-dateutil==2.9.0.post0 pytz==2025.2 PyYAML==6.0.3 regex==2025.9.18 requests==2.32.5 safetensors==0.6.2 scikit-learn==1.7.2 scipy==1.16.2 seaborn==0.13.2 sentencepiece==0.2.1 six==1.17.0 sympy==1.14.0 threadpoolctl==3.6.0 tiktoken==0.12.0 tokenizers==0.22.1 tqdm==4.67.1 transformers==4.57.0 transformers-stream-generator==0.0.5 typing_extensions==4.15.0 tzdata==2025.2 urllib3==2.5.0 Werkzeug==3.1.3 -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 升级方法 | Upgrade:
+# - PyTorch: 同第2部分方法。
+# - All others: 谨慎操作，可尝试重新生成此完整列表.
