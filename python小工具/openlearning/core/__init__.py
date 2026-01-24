@@ -1,53 +1,34 @@
-# Rule-Governed Architecture/rga/core/__init__.py
 """
-RGA核心模块 | RGA Core Module
-==============================
+core包 | core Package
+====================
 
-RGA（规则治理架构）的核心组件封装
-Core components encapsulation for Rule-Governed Architecture
-
-功能特性 | Features:
-• 统一API入口，简化导入 | Unified API entry, simplified imports
-• 配置驱动的架构设计 | Configuration-driven architecture design
-• 实时状态监控和相变检测 | Real-time state monitoring and phase transition detection
-• 多网络融合和信息流控制 | Multi-network fusion and information flow control
-
-主要组件 | Main Components:
-1. RGAConfig - 配置管理中心 | Configuration management center
-2. CoreMetricsCalculator - 核心度量计算器 | Core metrics calculator
-3. RGAEngine - 统一的RGA引擎 | Unified RGA engine
-
-设计哲学 | Design Philosophy:
-• 开箱即用，最小化配置 | Out-of-the-box, minimal configuration
-• 状态可监控，过程可追溯 | State monitorable, process traceable
-• 数学公式精确实现 | Precise implementation of mathematical formulas
+RGA架构核心模块包。
+RGA Architecture core module package.
 """
-
 import torch
 import torch.nn as nn
 from typing import Dict, List, Tuple, Optional, Any, Union, Callable
 import numpy as np
 import warnings
 
-# 导入核心组件 | Import core components
-from .config import RGAConfig
-from .metrics import CoreMetricsCalculator
+__version__ = "0.0.3"
+__author__ = "RGA Architecture Team"
 
-__version__ = "1.0.0"
-__author__ = "RGA Team"
-__all__ = [
-    "RGAConfig", 
-    "CoreMetricsCalculator", 
-    "RGAEngine",
-    "create_rga_engine",
-    "get_default_config",
-    "validate_config",
-    "calculate_state_change",
-    "detect_phase_transition",
-    "stack_three_networks",
-    "apply_one_way_valve"
-]
+# 直接从当前目录导入模块
+# Import modules directly from current directory
+try:
+    from config import RGAConfig
+    from metrics import CoreMetricsCalculator
+except ImportError:
+    # 如果直接导入失败，尝试相对导入
+    # If direct import fails, try relative import
+    try:
+        from .config import RGAConfig
+        from .metrics import CoreMetricsCalculator
+    except ImportError as e:
+        raise ImportError(f"Failed to import core modules: {e}")
 
+__all__ = ["RGAConfig", "CoreMetricsCalculator", "__version__", "__author__"]
 
 # ==================== 便捷函数 | Convenience Functions ====================
 def get_default_config(**kwargs) -> RGAConfig:

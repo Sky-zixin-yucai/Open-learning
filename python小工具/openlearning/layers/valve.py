@@ -548,6 +548,12 @@ def test_one_way_valve():
     print("✅ 所有测试通过 | All tests passed")
     return True
 
+__all__ = [
+    "OneWayValve",
+    "SimpleOneWayValve",
+    "create_one_way_valve",
+    "test_one_way_valve",
+]
 
 # ==================== 模块主入口 ====================
 # ==================== Module Main Entry ====================

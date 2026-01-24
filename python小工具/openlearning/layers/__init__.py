@@ -1,104 +1,173 @@
-﻿# Rule-Governed Architecture/rga/layers/__init__.py
-"""
-规则治理架构层模块 | Rule-Governed Architecture Layers Module
-=========================================================
+﻿"""
+layers包 | layers Package
+====================
 
-统一封装所有层模块，提供便捷的导入和扩展接口。
-Unified encapsulation of all layer modules, providing convenient import and extension interfaces.
+RGA架构层模块包，包含以下核心组件：
+RGA Architecture layers module package, includes the following core components:
 
-模块组织 | Module Organization:
-├── attention.py     - 注意力层 | Attention Layers
-├── balancer.py      - 平衡器层 | Balancer Layers
-├── embeddings.py    - 嵌入层 | Embedding Layers
-├── fusion.py       - 融合层 | Fusion Layers
-├── memory.py       - 记忆层 | Memory Layers
-├── normalization.py - 归一化层 | Normalization Layers
-└── valve.py        - 单向阀层 | One-Way Valve Layers
+1. 嵌入层 (Embeddings): EnhancedEmbeddingLayer, ConceptAwareEmbedding
+2. 融合层 (Fusion): SandwichFusion
+3. 记忆层 (Memory): GeologicalMemory
+4. 归一化层 (Normalization): FixedRMSNorm, FixedGroupRMSNorm, ScaledFixedRMSNorm
+5. 单向阀层 (Valve): OneWayValve, SimpleOneWayValve
+6. 平衡器层 (Balancer): TriValueBalancer, VDominantBalancer, DensityDrivenBalancer, AdaptiveStabilizer
+7. 注意力层 (Attention): VKQ_SubNet_WithFixedNorm, QVK_SubNet_WithFixedNorm, KQV_SubNet_WithFixedNorm, ChainReactionUnit_Final
 
-设计理念 | Design Philosophy:
-• 统一接口：提供一致的创建和访问接口 | Unified interface: Provide consistent creation and access interfaces
-• 模块化：支持独立使用或组合使用 | Modular: Support independent or combined usage
-• 可扩展：易于添加新层类型 | Extensible: Easy to add new layer types
-• 类型安全：完整的类型提示 | Type safety: Complete type hints
+设计原则:
+Design Principles:
+• 规则治理架构: 遵循RGA数学基础 | Rule-Governed Architecture: Follows RGA mathematical foundation
+• 模块化设计: 各层独立可组合 | Modular design: Each layer is independent and composable
+• 概念驱动: 基于词汇语义概念生成特征 | Concept-driven: Generate features based on word semantic concepts
+• 记忆分层: 三层深度地质记忆系统 | Memory layering: Three-layer geological memory system
 
-使用示例 | Usage Examples:
-    >>> # 直接导入具体层类 | Direct import specific layer classes
-    >>> from rga.layers import VKQ_SubNet_WithFixedNorm, TriValueBalancer, OneWayValve
-    >>> 
-    >>> # 使用工厂函数创建层 | Create layers using factory functions
-    >>> from rga.layers import create_attention_subnet, create_balancer_layer, create_one_way_valve
-    >>> subnet = create_attention_subnet('vkq', dim=128)
-    >>> balancer = create_balancer_layer('tri_value', dim=128)
-    >>> valve = create_one_way_valve(dim=128, valve_type='learnable')
-    >>> 
-    >>> # 批量创建模块 | Batch create modules
-    >>> from rga.layers import LayerFactory
-    >>> factory = LayerFactory()
-    >>> attention = factory.create('attention', subnet_type='vkq', dim=128)
-    >>> embedding = factory.create('embedding', vocab_size=10000, embed_dim=256)
-    >>> valve_layer = factory.create('valve', dim=128, valve_type='learnable')
+数学基础:
+Mathematical Foundation:
+• 连接点密度公式: D = 2m/((N+1)N) | Connection point density formula: D = 2m/((N+1)N)
+• 三明治融合: Q/K/V按固定权重融合 | Sandwich fusion: Q/K/V fused with fixed weights
+• 固定归一化: RMSNorm变体，无学习参数 | Fixed normalization: RMSNorm variants without learnable parameters
 """
 
-# ==================== 模块版本信息 ====================
-__version__ = "1.0.0"
-__author__ = "RGA Team"
+__version__ = "0.0.3"
+__author__ = "RGA Architecture Team"
 
 import sys
 from typing import Dict, List, Type, Any, Optional, Union, Callable, Tuple
 from dataclasses import dataclass, field
 
-# ==================== 基础层导入 ====================
-# ==================== Basic Layer Imports ====================
+# 直接从当前目录导入模块（绝对导入）
+# Import modules directly from current directory (absolute import)
+try:
+    from embeddings import EnhancedEmbeddingLayer
+    from embeddings import ConceptAwareEmbedding
+    from embeddings import create_embedding_layer
+    
+    from fusion import SandwichFusion
+    from fusion import create_sandwich_fusion
+    
+    from memory import GeologicalMemory
+    from memory import create_geological_memory
+    
+    from normalization import FixedRMSNorm
+    from normalization import FixedGroupRMSNorm
+    from normalization import ScaledFixedRMSNorm
+    from normalization import create_fixed_norm
+    
+    from valve import OneWayValve
+    from valve import SimpleOneWayValve
+    from valve import create_one_way_valve
+    
+    from balancer import TriValueBalancer
+    from balancer import VDominantBalancer
+    from balancer import DensityDrivenBalancer
+    from balancer import AdaptiveStabilizer
+    from balancer import create_balancer_layer
+    
+    from attention import VKQ_SubNet_WithFixedNorm
+    from attention import QVK_SubNet_WithFixedNorm
+    from attention import KQV_SubNet_WithFixedNorm
+    from attention import ChainReactionUnit_Final
+    from attention import create_attention_subnet
+    from attention import create_chain_reaction_unit
+    
+except ImportError:
+    # 如果直接导入失败，尝试相对导入
+    # If direct import fails, try relative import
+    try:
+        from .embeddings import EnhancedEmbeddingLayer
+        from .embeddings import ConceptAwareEmbedding
+        from .embeddings import create_embedding_layer
+        
+        from .fusion import SandwichFusion
+        from .fusion import create_sandwich_fusion
+        
+        from .memory import GeologicalMemory
+        from .memory import create_geological_memory
+        
+        from .normalization import FixedRMSNorm
+        from .normalization import FixedGroupRMSNorm
+        from .normalization import ScaledFixedRMSNorm
+        from .normalization import create_fixed_norm
+        
+        from .valve import OneWayValve
+        from .valve import SimpleOneWayValve
+        from .valve import create_one_way_valve
+        
+        from .balancer import TriValueBalancer
+        from .balancer import VDominantBalancer
+        from .balancer import DensityDrivenBalancer
+        from .balancer import AdaptiveStabilizer
+        from .balancer import create_balancer_layer
+        
+        from .attention import VKQ_SubNet_WithFixedNorm
+        from .attention import QVK_SubNet_WithFixedNorm
+        from .attention import KQV_SubNet_WithFixedNorm
+        from .attention import ChainReactionUnit_Final
+        from .attention import create_attention_subnet
+        from .attention import create_chain_reaction_unit
+        
+    except ImportError as e:
+        raise ImportError(f"Failed to import layers modules: {e}")
 
-# 从各模块导入主要类 | Import main classes from each module
-from .normalization import (
-    FixedRMSNorm,
-    FixedGroupRMSNorm,
-    ScaledFixedRMSNorm,
-)
+# ==================== 导出列表 ====================
+# ==================== Export List ====================
 
-from .attention import (
-    VKQ_SubNet_WithFixedNorm,
-    QVK_SubNet_WithFixedNorm,
-    KQV_SubNet_WithFixedNorm,
-    ChainReactionUnit_Final,
-)
+__all__ = [
+    # 嵌入层 | Embedding Layers
+    "EnhancedEmbeddingLayer",
+    "ConceptAwareEmbedding",
+    "create_embedding_layer",
+    
+    # 融合层 | Fusion Layers
+    "SandwichFusion",
+    "create_sandwich_fusion",
+    
+    # 记忆层 | Memory Layers
+    "GeologicalMemory",
+    "create_geological_memory",
+    
+    # 归一化层 | Normalization Layers
+    "FixedRMSNorm",
+    "FixedGroupRMSNorm",
+    "ScaledFixedRMSNorm",
+    "create_fixed_norm",
+    
+    # 单向阀层 | Valve Layers
+    "OneWayValve",
+    "SimpleOneWayValve",
+    "create_one_way_valve",
+    
+    # 平衡器层 | Balancer Layers
+    "TriValueBalancer",
+    "VDominantBalancer",
+    "DensityDrivenBalancer",
+    "AdaptiveStabilizer",
+    "create_balancer_layer",
+    
+    # 注意力层 | Attention Layers
+    "VKQ_SubNet_WithFixedNorm",
+    "QVK_SubNet_WithFixedNorm",
+    "KQV_SubNet_WithFixedNorm",
+    "ChainReactionUnit_Final",
+    "create_attention_subnet",
+    "create_chain_reaction_unit",
+]
 
-from .balancer import (
-    TriValueBalancer,
-    VDominantBalancer,
-    DensityDrivenBalancer,
-    AdaptiveStabilizer,
-)
+# ==================== 包配置 ====================
+# ==================== Package Configuration ====================
 
-from .embeddings import (
-    EnhancedEmbeddingLayer,
-    ConceptAwareEmbedding,
-)
-
-from .fusion import (
-    SandwichFusion,
-)
-
-from .memory import (
-    GeologicalMemory,
-)
-
-from .valve import (
-    OneWayValve,
-    SimpleOneWayValve,
-)
-
-# ==================== 工厂函数导入 ====================
-# ==================== Factory Function Imports ====================
-
-from .normalization import create_fixed_norm
-from .attention import create_attention_subnet, create_chain_reaction_unit
-from .balancer import create_balancer_layer
-from .embeddings import create_embedding_layer
-from .fusion import create_sandwich_fusion
-from .memory import create_geological_memory
-from .valve import create_one_way_valve
+LAYERS_CONFIG = {
+    "version": __version__,
+    "modules": {
+        "embeddings": ["EnhancedEmbeddingLayer", "ConceptAwareEmbedding", "create_embedding_layer"],
+        "fusion": ["SandwichFusion", "create_sandwich_fusion"],
+        "memory": ["GeologicalMemory", "create_geological_memory"],
+        "normalization": ["FixedRMSNorm", "FixedGroupRMSNorm", "ScaledFixedRMSNorm", "create_fixed_norm"],
+        "valve": ["OneWayValve", "SimpleOneWayValve", "create_one_way_valve"],
+        "balancer": ["TriValueBalancer", "VDominantBalancer", "DensityDrivenBalancer", "AdaptiveStabilizer", "create_balancer_layer"],
+        "attention": ["VKQ_SubNet_WithFixedNorm", "QVK_SubNet_WithFixedNorm", "KQV_SubNet_WithFixedNorm", "ChainReactionUnit_Final", "create_attention_subnet", "create_chain_reaction_unit"],
+    },
+    "description": "RGA Architecture Layers Module Package"
+}
 
 # ==================== 类型定义 ====================
 # ==================== Type Definitions ====================
@@ -458,7 +527,12 @@ class LayerRegistry:
             # 尝试直接创建类 | Try to create class directly
             layer_class = self.get_class(config.layer_type)
             if layer_class:
-                return layer_class(**config_dict)
+                # 创建参数字典，排除类不支持的参数
+                # 这些层不支持name参数和layer_type参数
+                unsupported_params = {'name', 'layer_type', 'kwargs'}
+                filtered_kwargs = {k: v for k, v in config_dict.items() 
+                                 if k not in unsupported_params}
+                return layer_class(**filtered_kwargs)
             else:
                 raise ValueError(f"未知的层类型: {config.layer_type}")
 
@@ -541,13 +615,19 @@ class LayerFactory:
             layer_class = self.registry.get_class(layer_type)
             if layer_class:
                 try:
-                    layer = layer_class(**kwargs)
+                    # 过滤掉类不支持的参数
+                    # 这些层不支持name参数和layer_type参数
+                    unsupported_params = {'name', 'layer_type', 'kwargs'}
+                    filtered_kwargs = {k: v for k, v in kwargs.items() 
+                                     if k not in unsupported_params}
+                    layer = layer_class(**filtered_kwargs)
                     self._created_layers[cache_key] = layer
                     return layer
                 except Exception as e2:
                     raise ValueError(
                         f"创建层 '{layer_type}' 失败: {e2}\n"
-                        f"参数: {kwargs}"
+                        f"参数: {kwargs}\n"
+                        f"过滤后的参数: {filtered_kwargs}"
                     )
             else:
                 raise ValueError(
@@ -924,13 +1004,16 @@ def test_layer_factory():
             print(f"✅ 成功创建 {layer_type}: {layer.__class__.__name__}")
             
             # 测试配置创建 | Test configuration creation
+            # 创建配置时不包含类不支持的参数
+            config_kwargs = kwargs.copy()
+            
             config = LayerConfig(
                 name=f"test_{layer_type}",
                 layer_type=layer_type,
                 dim=kwargs.get('dim'),
                 attention_subnet_type=kwargs.get('subnet_type'),
                 valve_type=kwargs.get('valve_type'),
-                kwargs=kwargs
+                kwargs=config_kwargs
             )
             
             layer_from_config = factory.create_from_config(config)

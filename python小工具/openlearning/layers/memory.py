@@ -786,6 +786,11 @@ def test_geological_memory():
     
     return True
 
+__all__ = [
+    "GeologicalMemory",
+    "create_geological_memory",
+    "test_geological_memory",
+]
 
 # ==================== 模块主入口 ====================
 # ==================== Module Main Entry ====================

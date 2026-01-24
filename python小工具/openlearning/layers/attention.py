@@ -28,8 +28,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, List, Dict, Optional, Union
-
-from .normalization import FixedRMSNorm
+# 尝试导入FixedRMSNorm模块 | Attempt to import FixedRMSNorm module
+try:
+    from normalization import FixedRMSNorm
+except ImportError:
+    # 如果直接导入失败，尝试相对导入
+    # If direct import fails, try relative import
+    try:
+        from .normalization import FixedRMSNorm
+    except ImportError as e:
+        raise ImportError(f"Failed to import core modules: {e}")
 
 
 class VKQ_SubNet_WithFixedNorm(nn.Module):

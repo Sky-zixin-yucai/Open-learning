@@ -801,6 +801,11 @@ def test_sandwich_fusion():
     
     return True
 
+__all__ = [
+    "SandwichFusion",
+    "create_sandwich_fusion",
+    "test_sandwich_fusion",
+]
 
 # ==================== 模块主入口 ====================
 # ==================== Module Main Entry ====================
