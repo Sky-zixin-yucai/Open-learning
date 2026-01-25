@@ -11,7 +11,7 @@ from typing import Dict, List, Tuple, Optional, Any, Union, Callable
 import numpy as np
 import warnings
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 __author__ = "RGA Architecture Team"
 
 # 直接从当前目录导入模块

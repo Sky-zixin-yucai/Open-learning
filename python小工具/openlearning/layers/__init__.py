@@ -27,7 +27,7 @@ Mathematical Foundation:
 • 固定归一化: RMSNorm变体，无学习参数 | Fixed normalization: RMSNorm variants without learnable parameters
 """
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 __author__ = "RGA Architecture Team"
 
 import sys

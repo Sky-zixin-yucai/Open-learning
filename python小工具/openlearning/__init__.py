@@ -11,7 +11,7 @@ import os
 from typing import Dict, List, Optional, Any, Union
 
 # ==================== 模块信息 ====================
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 __author__ = "RGA Architecture Team"
 __description__ = "RGA规则治理架构统一接口"
 
