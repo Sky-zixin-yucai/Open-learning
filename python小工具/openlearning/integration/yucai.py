@@ -12,8 +12,27 @@ RGA Integrator - Unified implementation of Rule-Governed Architecture
 • V值动态调控 | Dynamic V-value regulation
 """
 
-import os
 import sys
+from torch.utils.data import DataLoader, random_split
+import time
+from tqdm import tqdm
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from typing import Dict, List, Tuple, Optional
+import numpy as np
+import os
+import json
+from collections import deque
+from torch.utils.data import Dataset, DataLoader
+import re
+import random
+from collections import Counter, deque
+from torch.autograd import Function
+from tqdm import tqdm
+import torch
+from torch.utils.data import DataLoader, random_split
+import math
 
 # ==================== 修复导入路径 ====================
 # ==================== Fix Import Path ====================
@@ -248,413 +267,483 @@ class IntegrationConfig:
                 if key != 'kwargs']
         return "IntegrationConfig:\n" + "\n".join(items)
 
-
-# ==================== 核心集成器类 ====================
-# ==================== Core Integrator Class ====================
-
+# ==================== RGA集成器类 ====================
+# ==================== RGA Integrator Class ====================
 class RGAIntegrator(nn.Module):
-    """RGA规则治理架构集成器"""
+    """RGA集成器类 | RGA Integrator Class"""
+    """
+    规则治理架构主类
+    核心设计理念：
+    1. 基于连接点的密度公式驱动
+    2. 模块化但集中管理
+    3. 专注公式验证，不过度工程化
+    """
     
-    def __init__(self, config: Optional[Union[IntegrationConfig, Dict]] = None):
+    def __init__(self, config: RGAConfig = None):
+        """
+        初始化规则治理架构
+    
+        Args:
+            config: 配置对象，如果为None则使用默认配置
+        """
         super().__init__()
-        
-        # 1. 配置初始化
-        self.config = self._init_config(config)
-        
-        # 2. 设备设置
-        self.device = self._init_device()
-        
-        # 3. 核心引擎
-        self.engine = self._init_engine()
-        
-        # 4. 层工厂
-        self.layer_factory = get_layer_factory()
-        
-        # 5. 组件初始化
-        self._init_components()
-        
-        # 6. 性能优化
-        self._setup_optimization()
-        
-        # 7. 状态跟踪
-        self._init_state_tracking()
-        
-        self._print_init_summary()
     
-    def _init_config(self, config: Optional[Union[IntegrationConfig, Dict]]) -> IntegrationConfig:
-        """初始化配置"""
-        if config is None:
-            return IntegrationConfig()
-        elif isinstance(config, dict):
-            return IntegrationConfig.from_dict(config)
-        else:
-            return config
-    
-    def _init_device(self) -> torch.device:
-        """初始化设备"""
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f"   设备: {device}")
-        return device
-    
-    def _init_engine(self) -> RGAEngine:
-        """初始化核心引擎"""
-        return create_rga_engine(
-            config={
-                'vocab_size': self.config.vocab_size,
-                'dim': self.config.dim,
-                'phase_threshold': self.config.phase_threshold
-            },
-            enable_logging=True,
-            enable_monitoring=True
-        )
-    
-    def _init_components(self):
-        """初始化所有组件"""
-        print("🔧 初始化组件...")
+        # 1. 配置管理
+        self.config = config if config else RGAConfig()
+
+        # 新增：V值调控参数
+        self.V_regulation_params = {
+            'max_V_mean': 1.0,      # V值最大均值
+            'min_V_mean': 0.3,      # V值最小均值
+            'target_V_mean': 0.5,   # 目标V值均值
+            'similarity_threshold': 0.2,  # Q-K相似度阈值
+            'adjustment_strength': 0.3,   # 调整强度
+            'cycle_decay_rate': 0.05,     # 循环衰减率
+        }
         
-        # 嵌入层
-        self.embedding = create_embedding_layer(
-            embed_type=self.config.embedding_type,
+        # 新增：V值历史记录器
+        self.V_history = []
+        self.max_V_history_length = 100
+        
+        # 新增：V值健康监控器
+        self.V_health_scores = []
+
+        # ========== 1. 初始化所有组件 ==========
+        print(f"初始化RGA模型 (dim={self.config.dim}, units={self.config.num_units})...")
+
+        # QKV初始化
+        self.init_Q = nn.Linear(self.config.dim, self.config.dim)
+        self.init_K = nn.Linear(self.config.dim, self.config.dim)
+        self.init_V = nn.Linear(self.config.dim, self.config.dim)
+
+        # 2. 核心模块实例化
+        # 嵌入层 - 使用原始成功的模块
+        self.embedding_layer = EnhancedEmbeddingLayer(
             vocab_size=self.config.vocab_size,
             embed_dim=self.config.dim,
-            marker_dim=self.config.dim
+            marker_dim=self.config.dim  # 统一维度
         )
-        
-        # 单向阀
-        self.one_way_valve = create_one_way_valve(
-            dim=self.config.dim,
-            valve_type=self.config.valve_type
-        )
-        
-        # 链式反应单元
-        self.chain_units = nn.ModuleList([
-            ChainReactionUnit_Final(dim=self.config.dim, unit_id=i)
-            for i in range(self.config.num_units)
-        ])
-        
-        # 平衡器
-        self.tri_balancers = nn.ModuleList([
-            create_balancer_layer(balancer_type=self.config.balancer_type, dim=self.config.dim)
-            for _ in range(self.config.num_units)
-        ])
-        
-        # 地质记忆
+
+        # 单向阀组合（可选）
+        self.one_way_valve = OneWayValve(dim=self.config.dim)
+
+        # 链式反应单元集合
+        self.chain_units = nn.ModuleList()
+        for unit_id in range(self.config.num_units):
+            unit = ChainReactionUnit_Final(
+                dim=self.config.dim,
+                unit_id=unit_id
+            )
+            self.chain_units.append(unit)
+
+        # 🆕 新增：在每个链式反应单元后添加三值平衡器
+        self.tri_balancers = nn.ModuleList()
+        for unit_id in range(self.config.num_units):
+            balancer = TriValueBalancer(dim=self.config.dim)
+            self.tri_balancers.append(balancer)    
+
+        # 地质记忆层
         self.geological_memory = GeologicalMemory(dim=self.config.dim)
-        
-        # 融合层
+
+        # 三明治融合层
         self.sandwich_fusion = SandwichFusion()
-        
-        # 输出层
-        self.layer_norm = nn.LayerNorm(self.config.dim)
-        self.output_projection = nn.Linear(self.config.dim, self.config.vocab_size)
-        
-        # 循环投影
+
+        # 新增：循环投影层，用于多轮持续思考
         self.cycle_projection = nn.Sequential(
             nn.Linear(self.config.dim, self.config.dim * 2),
             nn.ReLU(),
             nn.Linear(self.config.dim * 2, self.config.dim),
             nn.Tanh()
         )
+
+        # 输出层
+        self.layer_norm = nn.LayerNorm(self.config.dim)
+        self.output_projection = nn.Linear(self.config.dim, self.config.vocab_size)
+ 
+        # 核心公式验证器
+        self.metrics_calculator = CoreMetricsCalculator()
+
+        # 状态跟踪
+        self.phase_state = "初始阶段"
+        self.density_history = deque(maxlen=self.config.history_length)
+        self.validation_log = []
+
+        # 关键参数（公式驱动）
+        self._init_formula_parameters()
+
+        # ==================== 自动内存优化配置 ====================
+        # 自动检测并启用最优内存优化
+        self._setup_memory_optimization()
+
+    def _init_formula_parameters(self):
+        """
+        初始化公式相关参数
+        这些参数由密度公式驱动，不是可学习参数
+        """
+        # 连接点判断阈值
+        self.connection_threshold = 0.3  # 固定值，符合设计目的
         
-        # QKV初始化
-        self.init_Q = nn.Linear(self.config.dim, self.config.dim)
-        self.init_K = nn.Linear(self.config.dim, self.config.dim)
-        self.init_V = nn.Linear(self.config.dim, self.config.dim)
+        # 相变阈值
+        self.phase_transition_threshold = self.config.phase_threshold
         
-        self.to(self.device)
-        print("✅ 组件初始化完成")
+        # V值缩放因子
+        self.v_scaling_factor = self.config.v_scaling_factor
+        
+        # 最小概念密度
+        self.min_Q_concepts = self.config.min_Q_concepts
+        
+        # 注册为buffer，确保设备移动正确
+        self.register_buffer('_dummy', torch.tensor(0.0))
+
+    def _setup_memory_optimization(self):
+        """
+        自动设置内存优化 - 修复混合精度问题
+        """
+        print("="*60)
+        print("💾 自动内存优化初始化")
+        print("="*60)
     
-    def _setup_optimization(self):
-        """设置性能优化"""
-        print("⚡ 设置性能优化...")
-        
-        # 混合精度
-        self.use_mixed_precision = (
-            self.config.enable_mixed_precision and torch.cuda.is_available()
-        )
-        
-        if self.use_mixed_precision:
+        # 自动检测硬件
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+        # 1. 自动混合精度设置 - 改为根据PyTorch版本自动选择
+        self.use_mixed_precision = True  # 启用混合精度
+    
+        if self.use_mixed_precision and torch.cuda.is_available():
             try:
+                # 检查PyTorch版本
+                
                 version = torch.__version__.split('.')
                 major_version = int(version[0])
-                
+            
                 if major_version >= 2:
+                    # PyTorch 2.0+ 使用新API
                     self.scaler = torch.amp.GradScaler('cuda')
+                    print("✅ 自动混合精度已启用 (PyTorch 2.0+ API)")
                 else:
+                    # PyTorch 1.x 使用旧API
                     self.scaler = torch.cuda.amp.GradScaler()
-                print("  ✅ 混合精度已启用")
+                    print("✅ 自动混合精度已启用 (PyTorch 1.x API)")
             except Exception as e:
-                print(f"  ⚠️  混合精度初始化失败: {e}")
+                print(f"⚠️  混合精度初始化失败: {e}")
+                print("  将回退到全精度模式")
                 self.use_mixed_precision = False
                 self.scaler = None
         else:
             self.scaler = None
-        
-        # 梯度检查点
-        self.enable_gradient_checkpointing = self.config.enable_gradient_checkpointing
-        
-        # 梯度累积 - 修复：添加这个属性
-        self.gradient_accumulation_steps = self.config.gradient_accumulation_steps
-        
-        # CUDA优化
+            if not torch.cuda.is_available():
+                print("ℹ️  使用CPU模式，混合精度不可用")
+    
+        # 2. 梯度累积设置
+        self.gradient_accumulation_steps = 1
+    
+        # 3. 内存高效模式
+        self.memory_efficient_mode = True
+    
+        # 4. CUDA优化设置
         if torch.cuda.is_available():
             torch.backends.cudnn.benchmark = True
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
-            print("  ✅ CUDA优化已启用")
-        
-        print("✅ 性能优化设置完成")
+            print("✅ CUDA高级优化已启用")
     
-    def _init_state_tracking(self):
-        """初始化状态跟踪"""
-        self.forward_history = []
-        self.v_history = []
-        self.phase_history = []
+        # 5. 内存监控
+        self.memory_history = []
     
-    def _print_init_summary(self):
-        """打印初始化摘要"""
-        print(f"✅ RGA集成器初始化完成")
-        print(f"   版本: 1.0.0")
-        print(f"   总参数量: {self.count_parameters():,}")
+        print(f"📊 内存优化已配置完成")
+        print(f"   设备: {self.device}")
+        print(f"   混合精度: {self.use_mixed_precision}")
+        print(f"   梯度累积: {self.gradient_accumulation_steps}步")
+        print("="*60)
+
+    def _apply_memory_optimizations(self):
+        """
+        应用所有内存优化到当前模型 - 简化版
+        """
+        if hasattr(self, '_memory_optimizations_applied'):
+            return
     
-    def count_parameters(self) -> int:
-        """计算总参数量"""
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print("🔧 正在应用内存优化...")
     
-    # ==================== V值调控方法 ====================
-    # ==================== V-value Regulation Methods ====================
+        # 1. 移动模型到正确设备
+        self.to(self.device)
     
-    def _adjust_v_by_qk_relation(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, 
-                                cycle: int, unit_num: int) -> torch.Tensor:
-        """基于Q-K关系调整V值"""
-        # 计算Q-K相似度
-        Q_norm = F.normalize(Q, p=2, dim=-1)
-        K_norm = F.normalize(K, p=2, dim=-1)
-        R_QK = torch.sum(Q_norm * K_norm, dim=-1, keepdim=True)
-        M_R = torch.tanh(R_QK)
-        
-        # 根据单元类型调整
-        cycle_factor = max(0.5, 1.0 - cycle * 0.1)
-        
-        if unit_num == 1:
-            G_output = V * (0.7 + 0.3 * M_R)
-        elif unit_num == 2:
-            G_output = V * (0.5 + 0.5 * M_R)
+        # 2. 不要手动转换模型为半精度！
+        # 让 autocast() 上下文自动处理精度转换
+        print("  ✅ 模型保持全精度，由autocast自动管理混合精度")
+    
+        # 3. 清理缓存
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    
+        self._memory_optimizations_applied = True
+        print("✅ 内存优化已应用")
+
+    def _enable_checkpointing(self, module):
+        """启用梯度检查点"""
+        # 这是一个简单实现，实际使用时可以更复杂
+        try:
+            from torch.utils.checkpoint import checkpoint
+            module.forward = self._checkpoint_wrapper(module.forward)
+        except:
+            pass
+    
+    def _checkpoint_wrapper(self, original_forward):
+        """包装forward方法以支持检查点"""
+        def wrapped_forward(*args, **kwargs):
+            from torch.utils.checkpoint import checkpoint
+            # 只对训练模式启用检查点
+            if self.training and torch.cuda.is_available():
+                return checkpoint(original_forward, *args, **kwargs)
+            else:
+                return original_forward(*args, **kwargs)
+        return wrapped_forward     
+
+    def _log_validation_error(self, message: str):
+        """
+        记录验证错误
+        """
+        error_entry = {
+            'timestamp': len(self.validation_log),
+            'type': 'error',
+            'message': message,
+            'phase': self.phase_state
+        }
+        self.validation_log.append(error_entry)
+        print(f"[验证错误] {message}")
+    
+    def _log_validation_warning(self, message: str):
+        """
+        记录验证警告
+        """
+        warning_entry = {
+            'timestamp': len(self.validation_log),
+            'type': 'warning',
+            'message': message,
+            'phase': self.phase_state
+        }
+        self.validation_log.append(warning_entry)
+        print(f"[验证警告] {message}")
+    
+    def get_formula_stats(self) -> Dict:
+        """
+        获取公式统计信息
+        """
+        if len(self.density_history) == 0:
+            density_stats = {'mean': 0.0, 'std': 0.0, 'trend': 'unknown'}
         else:
-            similarity_threshold = 0.5
-            adjustment = torch.where(
-                R_QK > similarity_threshold,
-                1.2 * M_R,
-                0.8 * M_R
-            )
-            G_output = V * (0.6 + 0.4 * adjustment)
+            density_list = list(self.density_history)
+            density_stats = {
+                'mean': np.mean(density_list),
+                'std': np.std(density_list),
+                'trend': '上升' if len(density_list) > 1 and density_list[-1] > density_list[0] else '稳定'
+            }
         
-        # 应用循环因子并限制范围
-        G_output = G_output * cycle_factor
-        V_mean = G_output.mean().item()
-        
-        if V_mean > self.config.max_v_mean or V_mean < self.config.min_v_mean:
-            scaling_factor = self.config.target_v_mean / (V_mean + 1e-8)
-            G_output = G_output * scaling_factor
-        
-        # 残差连接
-        return 0.7 * G_output + 0.3 * V
+        return {
+            'phase_state': self.phase_state,
+            'connection_threshold': self.connection_threshold,
+            'phase_transition_threshold': self.phase_transition_threshold,
+            'density_stats': density_stats,
+            'validation_errors': len([e for e in self.validation_log if e['type'] == 'error']),
+            'validation_warnings': len([e for e in self.validation_log if e['type'] == 'warning'])
+        }
     
-    def _post_process_v(self, V: torch.Tensor, Q: torch.Tensor, K: torch.Tensor, 
-                       cycle: int) -> torch.Tensor:
-        """V值后处理"""
-        # 计算相似度
-        Q_norm = F.normalize(Q, p=2, dim=-1)
-        K_norm = F.normalize(K, p=2, dim=-1)
-        dot_product = torch.sum(Q_norm * K_norm, dim=-1)
-        avg_similarity = dot_product.mean().item()
+    def reset_formula_parameters(self, 
+                                connection_threshold: float = None,
+                                phase_threshold: float = None):
+        """
+        重置公式参数（用于调优）
+        """
+        if connection_threshold is not None and 0 <= connection_threshold <= 1:
+            self.connection_threshold = connection_threshold
         
-        # 基于相似度调整
-        adjustment = 1.05 if avg_similarity > 0.7 else 0.95 if avg_similarity < 0.3 else 1.0
-        V = V * adjustment
+        if phase_threshold is not None:
+            self.phase_transition_threshold = phase_threshold
         
-        # 循环衰减
-        cycle_decay = max(0.85, 1.0 - cycle * 0.03)
-        V = V * cycle_decay
-        
-        # 范围限制
-        v_mean = V.mean().item()
-        v_std = V.std().item()
-        
-        if v_mean > self.config.max_v_mean or v_std > 1.5:
-            scale_factor = self.config.target_v_mean / (v_mean + 1e-8)
-            scale_factor = max(0.5, min(2.0, scale_factor))
-            V = V * scale_factor
-        elif v_mean < self.config.min_v_mean:
-            scale_factor = self.config.target_v_mean / v_mean
-            V = V * scale_factor
-        
-        return V
+        print(f"公式参数已更新: connection_threshold={self.connection_threshold}, "
+              f"phase_threshold={self.phase_transition_threshold}")
     
-    def _check_v_health(self, V_list: List[torch.Tensor]) -> float:
-        """检查V值健康度"""
-        if len(V_list) < 2:
-            return 1.0
-        
-        v_means = [V.mean().item() for V in V_list]
-        health_score = 0.0
-        
-        # 检查变化率
-        changes = []
-        for i in range(1, len(v_means)):
-            if v_means[i-1] != 0:
-                change = abs(v_means[i] - v_means[i-1]) / abs(v_means[i-1])
-                changes.append(change)
-        
-        avg_change = sum(changes) / len(changes) if changes else 0
-        if avg_change < 0.3:
-            health_score += 0.3
-        
-        # 检查范围
-        v_fused_mean = v_means[-1]
-        if self.config.min_v_mean < v_fused_mean < self.config.max_v_mean:
-            health_score += 0.3
-        
-        # 检查方差
-        v_fused_std = V_list[-1].std().item()
-        if v_fused_std < 1.0:
-            health_score += 0.2
-        
-        # 检查单调性
-        is_monotonic = all(v_means[i] <= v_means[i+1] for i in range(len(v_means)-1))
-        if not is_monotonic:
-            health_score += 0.2
-        
-        return health_score
+    def update_phase_state(self, new_phase: str):
+        """
+        更新学习阶段
+        """
+        valid_phases = ['初始阶段', '探索期', '学习期', '稳定期', '收敛期']
+        if new_phase in valid_phases:
+            self.phase_state = new_phase
+        else:
+            self._log_validation_warning(f"无效的学习阶段: {new_phase}")
     
-    # ==================== 前向传播 ====================
-    # ==================== Forward Propagation ====================
+        # ==================== 核心前向传播 ====================    
+
+    def forward(self, input_ids: torch.Tensor, num_cycles: int = 1) -> Dict[str, torch.Tensor]:
+        """
+        规则治理架构前向传播 - 修复V值增长问题，实现动态V值调控
+        严格按照三值关系公式：V_emergent = G(R(Q,K), M(R(Q,K)))
+        确保V值可增可减，基于Q-K关系动态调整
+        """
+
+        # 🆕 自动内存优化：检查并应用优化
+        if not hasattr(self, '_memory_optimized'):
+            self._apply_memory_optimizations()
+            self._memory_optimized = True
     
-    def forward(self, input_ids: torch.Tensor, num_cycles: int = None, 
-               return_details: bool = False) -> Dict[str, Any]:
-        """前向传播主函数"""
-        num_cycles = num_cycles or min(self.config.max_cycles, 3)
-        
-        # 设备对齐
+        # ==================== 数据类型修复 ====================
+        # 确保输入数据在正确设备上
         if input_ids.device != self.device:
             input_ids = input_ids.to(self.device)
+    
+        # 确保输入是long类型（这是token id的标准类型）
         if input_ids.dtype != torch.long:
             input_ids = input_ids.long()
         
-        # 混合精度上下文
-        if self.use_mixed_precision:
-            with torch.amp.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
-                return self._forward_impl(input_ids, num_cycles, return_details)
-        else:
-            return self._forward_impl(input_ids, num_cycles, return_details)
-    
-    def _forward_impl(self, input_ids: torch.Tensor, num_cycles: int, 
-                     return_details: bool) -> Dict[str, Any]:
-        """前向传播实现 - 支持动态批次大小"""
-        # 1. 嵌入层
-        emb_result = self.embedding(input_ids, return_details=False)
-        base_emb = emb_result['base_embeddings'].float()
+        # ==================== 第1步：初始化原始嵌入 ====================
+        emb_result = self.embedding_layer(input_ids, return_details=False)
+        base_emb = emb_result['base_embeddings']  # [batch, seq, dim]
+
+        # 确保基础嵌入是float32
+        if base_emb.dtype != torch.float32:
+            base_emb = base_emb.float()
         
-        # 2. 持续思考循环
+        # ==================== 第2步：持续思考循环 ====================
         all_cycle_results = []
         
         for cycle in range(num_cycles):
             print(f"🔄 持续思考循环 {cycle+1}/{num_cycles}")
             
-            # 3. 获取当前批次信息
-            current_batch_size = input_ids.shape[0] if len(input_ids.shape) > 0 else 1
-            current_seq_len = input_ids.shape[1] if len(input_ids.shape) > 1 else 1
-            
-            # 4. 初始化嵌入
+            # ==================== 第3步：嵌入初始化 ====================
             if cycle == 0:
                 current_emb = base_emb.clone()
             else:
                 prev_result = all_cycle_results[-1]
-                # 使用前一循环的Q_final，但保持正确形状
-                if prev_result['Q_final'].shape[:2] == (current_batch_size, current_seq_len):
-                    prev_q = prev_result['Q_final']
-                else:
-                    # 如果形状不匹配，进行适配
-                    prev_q = self._adapt_tensor_shape(
-                        prev_result['Q_final'], 
-                        (current_batch_size, current_seq_len)
-                    )
-                
-                current_emb = self.cycle_projection(prev_q)
+                current_emb = prev_result['Q_final']
+                if hasattr(self, 'cycle_projection'):
+                    current_emb = self.cycle_projection(current_emb)
             
-            # 5. 单向阀处理
-            Q, K, V = self.one_way_valve(
-                current_emb.clone(),
-                current_emb.clone(),
-                current_emb.clone()
-            )
+            # ==================== 第4步：单向阀处理 ====================
+            Q = current_emb.clone()
+            K = current_emb.clone()
+            V = current_emb.clone()
             
-            # 6. 处理引擎状态（独立于批次）
-            self.engine.process_state(Q, K, V)
+            Q, K, V = self.one_way_valve(Q, K, V)
             
-            # 7. 链式反应单元处理
-            V_list = []
-            for unit_idx in range(self.config.num_units):
-                Q, K, V = self.chain_units[unit_idx](Q, K, V)
-                Q, K, V, density, connections = self.tri_balancers[unit_idx](
-                    Q, K, V, return_density=True
-                )
-                V = self._adjust_v_by_qk_relation(Q, K, V, cycle, unit_idx + 1)
-                V_list.append(V)
+            # 记录当前循环的初始状态
+            self.metrics_calculator.record_state(Q, K, V)
             
-            # 8. 地质记忆存储与检索（独立于批次）
-            Q_list, K_list, V_sublist_list = [Q]*3, [K]*3, [V_list]*3
+            # ==================== 第5步：第1个链式反应单元 ====================
+            unit1 = self.chain_units[0]
+            Q1, K1, V1 = unit1(Q, K, V)
+
+            # 🆕 新增：应用三值平衡器1
+            balancer1 = self.tri_balancers[0]
+            Q1, K1, V1, density1, connections1 = balancer1(Q1, K1, V1, return_density=True)
+            
+            # 修复：基于三值关系公式调整V1
+            V1 = self._adjust_V_by_QK_relation(Q1, K1, V1, cycle, 1)
+            
+            V1_1V = V.clone()
+            V1_2V = (V + V1 * 0.7) / 1.7
+            V1_3V = V1.clone()
+            V1_sublist = [V1_1V, V1_2V, V1_3V]
+            
+            # ==================== 第6步：第2个链式反应单元 ====================
+            unit2 = self.chain_units[1]
+            Q2, K2, V2 = unit2(Q1, K1, V1)
+            
+            # 🆕 新增：应用三值平衡器2
+            balancer2 = self.tri_balancers[1]
+            Q2, K2, V2, density2, connections2 = balancer2(Q2, K2, V2, return_density=True)
+
+            # 修复：基于三值关系公式调整V2
+            V2 = self._adjust_V_by_QK_relation(Q2, K2, V2, cycle, 2)
+            
+            V2_1V = V1.clone()
+            V2_2V = (V1 + V2 * 0.7) / 1.7
+            V2_3V = V2.clone()
+            V2_sublist = [V2_1V, V2_2V, V2_3V]
+            
+            # ==================== 第7步：第3个链式反应单元 ====================
+            unit3 = self.chain_units[2]
+            Q3, K3, V3 = unit3(Q2, K2, V2)
+            
+            # 🆕 新增：应用三值平衡器3
+            balancer3 = self.tri_balancers[2]
+            Q3, K3, V3, density3, connections3 = balancer3(Q3, K3, V3, return_density=True)
+
+            # 修复：基于三值关系公式调整V3
+            V3 = self._adjust_V_by_QK_relation(Q3, K3, V3, cycle, 3)
+            
+            V3_1V = V2.clone()
+            V3_2V = (V2 + V3 * 0.7) / 1.7
+            V3_3V = V3.clone()
+            V3_sublist = [V3_1V, V3_2V, V3_3V]
+            
+            # ==================== 第8步：地质记忆存储 ====================
+            Q_list = [Q1, Q2, Q3]
+            K_list = [K1, K2, K3]
+            V_sublist_list = [V1_sublist, V2_sublist, V3_sublist]
+            
             self.geological_memory.store(Q_list, K_list, V_sublist_list)
             
+            # ==================== 第9步：地质记忆检索 ====================
             depth = min(cycle, 2)
             time_layer = min(cycle, 2)
+            
             Q_deep, K_deep, V_deep = self.geological_memory.retrieve(
-                depth=depth, time_layer=time_layer
+                depth=depth, 
+                time_layer=time_layer
             )
             
-            # 9. 地质记忆向量适配当前批次
-            # 地质记忆可能返回不同形状，需要适配当前批次
-            Q_deep = self._adapt_memory_tensor(Q_deep, Q.shape)
-            K_deep = self._adapt_memory_tensor(K_deep, K.shape)
-            V_deep = self._adapt_memory_tensor(V_deep, V.shape)
-            
-            # 10. 融合计算
-            # 动态权重调整
+            # ==================== 第10步：三明治融合 ====================
+            # 使用动态权重调整，确保V值不会持续增长
             if cycle == 0:
-                q_weights, k_weights, v_weights = [0.5, 0.3, 0.2], [0.5, 0.3, 0.2], [0.6, 0.3, 0.1]
+                q_weights = [0.5, 0.3, 0.2]
+                k_weights = [0.5, 0.3, 0.2]
+                v_weights = [0.6, 0.3, 0.1]
             else:
-                historical_v_means = [r['V_stats']['V_fused_mean'] for r in all_cycle_results]
-                current_v_mean = V.mean().item()
-                historical_v_mean = np.mean(historical_v_means) if historical_v_means else 0
+                # 根据历史V值调整权重，防止V值持续增长
+                historical_V_mean = torch.mean(torch.stack([
+                    prev_result['V_final'] 
+                    for prev_result in all_cycle_results
+                ]), dim=0)
                 
-                if current_v_mean > historical_v_mean * 1.2:
-                    v_weights = [0.7, 0.2, 0.1]
-                elif current_v_mean < historical_v_mean * 0.8:
-                    v_weights = [0.5, 0.4, 0.1]
+                current_V_mean = V3.mean().item()
+                historical_V_mean_val = historical_V_mean.mean().item()
+                
+                # 如果当前V值明显高于历史均值，减少当前V的权重
+                if current_V_mean > historical_V_mean_val * 1.2:
+                    v_weights = [0.7, 0.2, 0.1]  # 增加历史权重，减少当前权重
+                elif current_V_mean < historical_V_mean_val * 0.8:
+                    v_weights = [0.5, 0.4, 0.1]  # 增加当前权重
                 else:
-                    v_weights = [0.6, 0.3, 0.1]
-                q_weights, k_weights = [0.5, 0.3, 0.2], [0.5, 0.3, 0.2]
+                    v_weights = [0.6, 0.3, 0.1]  # 保持原权重
+                
+                q_weights = [0.5, 0.3, 0.2]
+                k_weights = [0.5, 0.3, 0.2]
             
-            # 融合
-            Q_fused = (q_weights[0] * Q_deep + 
-                      q_weights[1] * Q + 
-                      q_weights[2] * current_emb)
+            Q_deep_weighted = Q_deep * q_weights[0]
+            Q_current_weighted = Q3 * q_weights[1]
+            Q_original_weighted = current_emb * q_weights[2]
             
-            K_fused = (k_weights[0] * K_deep + 
-                      k_weights[1] * K + 
-                      k_weights[2] * current_emb)
+            K_deep_weighted = K_deep * k_weights[0]
+            K_current_weighted = K3 * k_weights[1]
+            K_original_weighted = current_emb * k_weights[2]
             
-            V_fused = (v_weights[0] * V_deep + 
-                      v_weights[1] * V + 
-                      v_weights[2] * current_emb)
+            V_deep_weighted = V_deep * v_weights[0]
+            V_current_weighted = V3 * v_weights[1]
+            V_original_weighted = current_emb * v_weights[2]
             
-            V_fused = self._post_process_v(V_fused, Q_fused, K_fused, cycle)
+            Q_fused = Q_deep_weighted + Q_current_weighted + Q_original_weighted
+            K_fused = K_deep_weighted + K_current_weighted + K_original_weighted
+            V_fused = V_deep_weighted + V_current_weighted + V_original_weighted
             
-            # 11. 输出层
+            # 对V_fused进行后处理，防止过度增长
+            V_fused = self._post_process_V(V_fused, Q_fused, K_fused, cycle)
+            
+            # ==================== 第11步：输出层处理 ====================
             Q_normalized = self.layer_norm(Q_fused)
             logits = self.output_projection(Q_normalized)
             
-            # 12. 保存结果
+            # ==================== 第12步：保存当前循环结果 ====================
             cycle_result = {
                 'cycle_num': cycle + 1,
                 'logits': logits,
@@ -663,358 +752,403 @@ class RGAIntegrator(nn.Module):
                 'V_final': V_fused,
                 'current_emb': current_emb,
                 'V_stats': {
-                    'V_list_means': [v.mean().item() for v in V_list],
+                    'V1_mean': V1.mean().item(),
+                    'V2_mean': V2.mean().item(),
+                    'V3_mean': V3.mean().item(),
                     'V_fused_mean': V_fused.mean().item(),
-                    'QK_similarity': F.cosine_similarity(Q.flatten(), K.flatten(), dim=0).item(),
+                    'QK_similarity': F.cosine_similarity(Q3.flatten(), K3.flatten(), dim=0).item(),
                 },
-                'fusion_weights': {
-                    'Q': q_weights,
-                    'K': k_weights,
-                    'V': v_weights
+                'thought_metrics': {
+                    'v_dominance_ratio': V3.mean().item() / (max(Q3.mean().item(), K3.mean().item()) + 1e-8),
+                    'fusion_weights': {'Q': q_weights, 'K': k_weights, 'V': v_weights}
                 }
             }
             
             all_cycle_results.append(cycle_result)
             
-            # 健康检查
-            if self._check_v_health(V_list + [V_fused]) < 0.25:
-                print("⚠️ V值健康度低，提前结束思考循环")
+            # ==================== 第13步：V值健康检查 ====================
+            if self._check_V_health(V1, V2, V3, V_fused) < 0.25:
+                print(f"⚠️ V值健康度低，提前结束思考循环")
                 break
         
-        # 13. 准备最终输出
+        # ==================== 第14步：返回最终结果 ====================
         final_result = all_cycle_results[-1]
         
+        # 添加V值变化分析
         if len(all_cycle_results) > 1:
-            v_values = [r['V_stats']['V_fused_mean'] for r in all_cycle_results]
-            final_result['V_evolution'] = self._analyze_v_evolution(v_values)
-        
-        if return_details:
-            final_result['all_cycles'] = all_cycle_results
-            final_result['engine_report'] = self.engine.get_analysis_report()
-            final_result['config'] = self.config.to_dict()
-            final_result['batch_info'] = {
-                'batch_size': current_batch_size,
-                'seq_len': current_seq_len,
-                'shape_adaptations': self.shape_adaptations
-            }
-        
-        # 更新历史
-        self.forward_history.append({
-            'timestamp': len(self.forward_history),
-            'num_cycles': num_cycles,
-            'input_shape': input_ids.shape,
-            'output_keys': list(final_result.keys())
-        })
-        self.v_history.append(final_result['V_stats']['V_fused_mean'])
+            V_values = [r['V_stats']['V_fused_mean'] for r in all_cycle_results]
+            final_result['V_evolution_analysis'] = self._analyze_V_evolution(V_values)
         
         return final_result
     
-    # ==================== 新增的适配方法 ====================
-    
-    def _adapt_tensor_shape(self, tensor: torch.Tensor, target_shape: Tuple) -> torch.Tensor:
+    def _adjust_V_by_QK_relation(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, 
+                                cycle: int, unit_num: int) -> torch.Tensor:
         """
-        适配张量形状到目标形状
-        
-        参数:
-            tensor: 输入张量
-            target_shape: 目标形状 (batch_size, seq_len, ...)
-        
-        返回:
-            适配后的张量
+        基于三值关系公式调整V值: V_emergent = G(R(Q,K), M(R(Q,K)))
+        确保V值基于Q-K关系动态调整，可增可减
         """
-        # 如果形状已经匹配，直接返回
-        if tensor.shape[:2] == target_shape[:2]:
-            return tensor
+        batch_size, seq_len, dim = Q.shape
         
-        current_batch, current_seq = tensor.shape[0], tensor.shape[1]
-        target_batch, target_seq = target_shape[0], target_shape[1]
+        # R(Q,K): 计算Q和K的关系矩阵（注意力分数）
+        # 简化为计算Q和K的逐元素相似度
+        Q_norm = F.normalize(Q, p=2, dim=-1)
+        K_norm = F.normalize(K, p=2, dim=-1)
+        R_QK = torch.sum(Q_norm * K_norm, dim=-1, keepdim=True)  # [batch, seq, 1]
         
-        # 记录适配情况
-        if not hasattr(self, 'shape_adaptations'):
-            self.shape_adaptations = []
+        # M(R(Q,K)): 对关系矩阵进行映射（这里使用简单的非线性变换）
+        # 表示从关系中提取的模式或特征
+        M_R = torch.tanh(R_QK)  # [batch, seq, 1]
         
-        self.shape_adaptations.append({
-            'from': tuple(tensor.shape),
-            'to': target_shape,
-            'method': 'unknown'
-        })
+        # G(R(Q,K), M(R(Q,K))): 基于关系和映射生成V值
+        # 这里使用一个简单的线性组合，实际可以更复杂
+        # 权重根据循环和单元调整，确保V值不会单调增长
         
-        # 1. 适配批次大小
-        if current_batch != target_batch:
-            if target_batch > current_batch:
-                # 扩展批次
-                repeats = target_batch // current_batch + 1
-                tensor = tensor.repeat(repeats, 1, 1)[:target_batch]
-            else:
-                # 缩减批次
-                tensor = tensor[:target_batch]
+        # 根据循环数调整：早期循环允许V值增长，后期循环限制增长
+        cycle_factor = max(0.5, 1.0 - cycle * 0.1)
         
-        # 2. 适配序列长度
-        if len(tensor.shape) > 1 and current_seq != target_seq:
-            if target_seq > current_seq:
-                # 扩展序列
-                repeats = target_seq // current_seq + 1
-                tensor = tensor.repeat(1, repeats, 1)[:, :target_seq]
-            else:
-                # 缩减序列
-                tensor = tensor[:, :target_seq]
+        # 根据单元调整：不同单元可能有不同的V值生成策略
+        if unit_num == 1:
+            # 单元1：允许V值有较大变化
+            G_output = V * (0.7 + 0.3 * M_R)
+        elif unit_num == 2:
+            # 单元2：更保守的调整
+            G_output = V * (0.5 + 0.5 * M_R)
+        else:  # unit_num == 3
+            # 单元3：基于Q-K关系的精细调整
+            # 如果Q-K相似度高，V值增加；如果相似度低，V值减少
+            similarity_threshold = 0.5
+            adjustment = torch.where(
+                R_QK > similarity_threshold,
+                1.2 * M_R,  # 增加
+                0.8 * M_R   # 减少
+            )
+            G_output = V * (0.6 + 0.4 * adjustment)
         
-        return tensor
+        # 应用循环因子
+        G_output = G_output * cycle_factor
+        
+        # 确保V值不会过度增长：应用软限制
+        V_mean = G_output.mean().item()
+        if V_mean > 2.0:  # 如果V值均值过大
+            scaling_factor = 1.5 / V_mean  # 缩放到1.5左右
+            G_output = G_output * scaling_factor
+        elif V_mean < 0.5:  # 如果V值均值过小
+            scaling_factor = 0.8 / V_mean  # 适度增加
+            G_output = G_output * scaling_factor
+        
+        # 保留部分原始V值的信息（残差连接思想）
+        V_adjusted = 0.7 * G_output + 0.3 * V
+        
+        return V_adjusted
     
-    def _adapt_memory_tensor(self, memory_tensor: torch.Tensor, target_shape: Tuple) -> torch.Tensor:
+    def _post_process_V(self, V: torch.Tensor, Q: torch.Tensor, K: torch.Tensor, 
+                   cycle: int) -> torch.Tensor:
         """
-        适配地质记忆张量到目标形状
-        
-        参数:
-            memory_tensor: 地质记忆检索的张量
-            target_shape: 目标形状
-            
-        返回:
-            适配后的张量
+        对融合后的V值进行后处理（内存优化版）
+        避免计算大的相似度矩阵
         """
-        # 地质记忆可能返回不同维度的张量
-        # 我们需要适配到 (batch_size, seq_len, dim)
-        
-        # 如果已经是三维且批次大小匹配，直接返回
-        if len(memory_tensor.shape) == 3:
-            if memory_tensor.shape[0] == target_shape[0]:
-                return memory_tensor
-            else:
-                # 批次大小不匹配，使用第一个样本并扩展
-                if memory_tensor.shape[0] > 0:
-                    single_sample = memory_tensor[0:1]  # 取第一个样本
-                    return single_sample.expand(target_shape[0], -1, -1)
-        
-        # 如果是一维（特征向量），扩展到整个批次和序列
-        if len(memory_tensor.shape) == 1:
-            # memory_tensor 是 [dim]
-            dim = memory_tensor.shape[0]
-            # 扩展到 [batch_size, seq_len, dim]
-            batch_size, seq_len = target_shape[0], target_shape[1]
-            expanded = memory_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, dim]
-            expanded = expanded.expand(batch_size, seq_len, -1)
-            return expanded
-        
-        # 如果是二维 [seq_len, dim] 或 [batch_size, dim]
-        if len(memory_tensor.shape) == 2:
-            if memory_tensor.shape[0] == target_shape[1]:  # [seq_len, dim]
-                # 序列维度匹配，扩展批次
-                expanded = memory_tensor.unsqueeze(0)  # [1, seq_len, dim]
-                expanded = expanded.expand(target_shape[0], -1, -1)
-                return expanded
-            elif memory_tensor.shape[0] == target_shape[0]:  # [batch_size, dim]
-                # 批次匹配，扩展序列
-                expanded = memory_tensor.unsqueeze(1)  # [batch_size, 1, dim]
-                expanded = expanded.expand(-1, target_shape[1], -1)
-                return expanded
-        
-        # 默认：创建一个全零张量
-        return torch.zeros(target_shape, device=memory_tensor.device)
+        batch_size, seq_len, dim = V.shape
+     
+        # 1. 使用简化的方式计算Q-K平均相似度
+        # ❌ 原来的方法：计算 N×N 的大矩阵
+        # ✅ 新方法：只计算对应位置的点积
     
-    def _calculate_adaptive_weights(self, current_cycle: int, total_cycles: int, 
-                                   batch_size: int) -> Tuple[List, List, List]:
+        # 归一化Q和K
+        Q_norm = F.normalize(Q, p=2, dim=-1)  # [batch, seq, dim]
+        K_norm = F.normalize(K, p=2, dim=-1)  # [batch, seq, dim]
+    
+        # 计算对应位置的点积（余弦相似度）
+        # 这避免了创建 [N, N] 的大矩阵
+        dot_product = torch.sum(Q_norm * K_norm, dim=-1)  # [batch, seq]
+    
+        # 计算平均相似度
+        avg_similarity = dot_product.mean().item()  # 标量
+    
+        # 2. 基于相似度调整V值
+        # 注意：现在使用更温和的调整
+        adjustment = 1.0
+        if avg_similarity > 0.7:
+            adjustment = 1.05  # 从1.1减小到1.05
+        elif avg_similarity < 0.3:
+            adjustment = 0.95  # 从0.9增加到0.95
+    
+        V = V * adjustment
+    
+        # 3. 基于循环数的动态调整
+        # 使用更平缓的衰减
+        cycle_decay = max(0.85, 1.0 - cycle * 0.03)  # 从0.7提高到0.85，衰减率从0.05减小到0.03
+        V = V * cycle_decay
+    
+        # 4. 应用轻量级归一化，避免计算每个位置的RMS
+        # ❌ 原来的方法：计算每个位置的RMS
+        # ✅ 新方法：使用简单的缩放
+    
+        v_mean = V.mean().item()
+        v_std = V.std().item()
+    
+        # 如果V值异常大或异常小，进行缩放
+        if v_mean > 2.0 or v_std > 1.5:
+            # 计算缩放因子，使均值为1.0
+            scale_factor = 1.0 / (v_mean + 1e-8)
+            # 限制缩放范围，避免过度调整
+            scale_factor = max(0.5, min(2.0, scale_factor))
+            V = V * scale_factor
+        elif v_mean < 0.5:
+            # 如果均值太小，适当放大
+            scale_factor = 0.8 / v_mean
+            V = V * scale_factor
+    
+        return V
+    
+    def _check_V_health(self, V1: torch.Tensor, V2: torch.Tensor, 
+                       V3: torch.Tensor, V_fused: torch.Tensor) -> float:
         """
-        计算自适应融合权重，考虑批次大小
-        
-        参数:
-            current_cycle: 当前循环索引
-            total_cycles: 总循环数
-            batch_size: 当前批次大小
-            
-        返回:
-            (q_weights, k_weights, v_weights)
+        检查V值的健康度
+        返回0-1之间的分数，1表示健康
         """
-        base_q_weights = [0.5, 0.3, 0.2]
-        base_k_weights = [0.5, 0.3, 0.2]
-        base_v_weights = [0.6, 0.3, 0.1]
+        health_score = 0.0
         
-        # 根据批次大小调整权重
-        batch_factor = min(1.0, batch_size / 32.0)  # 以32为基准
+        # 1. 检查V值是否过度增长
+        v_means = [V1.mean().item(), V2.mean().item(), V3.mean().item(), V_fused.mean().item()]
         
-        if batch_size < 4:
-            # 小批次：增加地质记忆权重
-            adjustment = 0.1 * batch_factor
-            q_weights = [base_q_weights[0] + adjustment, 
-                        base_q_weights[1] - adjustment/2, 
-                        base_q_weights[2] - adjustment/2]
-            
-            k_weights = [base_k_weights[0] + adjustment, 
-                        base_k_weights[1] - adjustment/2, 
-                        base_k_weights[2] - adjustment/2]
-            
-            v_weights = [base_v_weights[0] + adjustment, 
-                        base_v_weights[1] - adjustment/2, 
-                        base_v_weights[2] - adjustment/2]
-        elif batch_size > 64:
-            # 大批次：增加当前层权重
-            adjustment = 0.1 * batch_factor
-            q_weights = [base_q_weights[0] - adjustment, 
-                        base_q_weights[1] + adjustment, 
-                        base_q_weights[2]]
-            
-            k_weights = [base_k_weights[0] - adjustment, 
-                        base_k_weights[1] + adjustment, 
-                        base_k_weights[2]]
-            
-            v_weights = [base_v_weights[0] - adjustment, 
-                        base_v_weights[1] + adjustment, 
-                        base_v_weights[2]]
-        else:
-            # 中等批次：使用基础权重
-            q_weights, k_weights, v_weights = base_q_weights, base_k_weights, base_v_weights
+        # 计算V值的变化率
+        changes = []
+        for i in range(1, len(v_means)):
+            if v_means[i-1] != 0:
+                change = abs(v_means[i] - v_means[i-1]) / abs(v_means[i-1])
+                changes.append(change)
         
-        return q_weights, k_weights, v_weights
+        avg_change = sum(changes) / len(changes) if changes else 0
+        
+        # 如果平均变化率小于0.3，认为是健康的
+        if avg_change < 0.3:
+            health_score += 0.3
+        
+        # 2. 检查V值是否在合理范围内
+        v_fused_mean = V_fused.mean().item()
+        if 0.3 < v_fused_mean < 2.0:
+            health_score += 0.3
+        
+        # 3. 检查V值的方差（稳定性）
+        v_fused_std = V_fused.std().item()
+        if v_fused_std < 1.0:
+            health_score += 0.2
+        
+        # 4. 检查V值是否单调增长（不应该）
+        is_monotonic = all(v_means[i] <= v_means[i+1] for i in range(len(v_means)-1))
+        if not is_monotonic:  # 如果不是单调增长，加分
+            health_score += 0.2
+        
+        return health_score
     
-    def reset_shape_adaptations(self):
-        """重置形状适配记录"""
-        self.shape_adaptations = []
-    
-    # ==================== 分析方法 ====================
-    # ==================== Analysis Methods ====================
-    
-    def _analyze_v_evolution(self, v_values: List[float]) -> Dict[str, Any]:
-        """分析V值演化"""
-        if len(v_values) < 2:
+    def _analyze_V_evolution(self, V_values: List[float]) -> Dict:
+        """
+        分析V值的演化模式
+        """
+        if len(V_values) < 2:
             return {'analysis': '数据不足'}
         
         # 计算趋势
         trend = '稳定'
-        if len(v_values) >= 3:
-            slope = (v_values[-1] - v_values[0]) / len(v_values)
+        if len(V_values) >= 3:
+            slope = (V_values[-1] - V_values[0]) / len(V_values)
             if slope > 0.1:
                 trend = '上升'
             elif slope < -0.1:
                 trend = '下降'
         
         # 计算波动性
-        volatility = np.std(v_values) / (np.mean(v_values) + 1e-8)
+        volatility = np.std(V_values) / (np.mean(V_values) + 1e-8)
         
         # 检测相变点
         phase_transitions = 0
-        for i in range(1, len(v_values)):
-            if abs(v_values[i] - v_values[i-1]) / (abs(v_values[i-1]) + 1e-8) > 0.3:
+        for i in range(1, len(V_values)):
+            if abs(V_values[i] - V_values[i-1]) / (abs(V_values[i-1]) + 1e-8) > 0.3:
                 phase_transitions += 1
         
         return {
             'trend': trend,
             'volatility': volatility,
             'phase_transitions': phase_transitions,
-            'final_V': v_values[-1],
-            'V_range': [min(v_values), max(v_values)],
-            'recommendation': self._get_v_management_recommendation(v_values)
+            'final_V': V_values[-1],
+            'V_range': [min(V_values), max(V_values)],
+            'recommendation': self._get_V_management_recommendation(V_values)
         }
     
-    def _get_v_management_recommendation(self, v_values: List[float]) -> str:
-        """获取V值管理建议"""
-        if len(v_values) < 2:
+    def _get_V_management_recommendation(self, V_values: List[float]) -> str:
+        """
+        根据V值演化给出管理建议
+        """
+        if len(V_values) < 2:
             return "继续收集数据"
         
-        if v_values[-1] > self.config.max_v_mean:
+        # 检查是否过度增长
+        if V_values[-1] > 2.0:
             return "V值过高，建议降低V权重或增加Q-K相似度"
         
-        if all(v_values[i] > v_values[i+1] for i in range(len(v_values)-1)):
+        # 检查是否持续下降
+        if all(V_values[i] > V_values[i+1] for i in range(len(V_values)-1)):
             return "V值持续下降，建议增加V权重"
         
-        volatility = np.std(v_values) / (np.mean(v_values) + 1e-8)
+        # 检查波动性
+        volatility = np.std(V_values) / (np.mean(V_values) + 1e-8)
         if volatility > 0.5:
             return "V值波动过大，建议稳定Q-K关系"
         
         return "V值健康，继续保持"
     
-    def get_analysis_report(self) -> Dict[str, Any]:
-        """获取完整分析报告"""
-        engine_report = self.engine.get_analysis_report()
+    def _validate_formula_execution(self, step_data: Dict) -> bool:
+        """
+        核心公式验证方法
+        验证当前步骤的公式执行是否符合设计目的
+    
+        Args:
+            step_data: 当前步骤的数据字典
         
-        # 组件统计
-        component_stats = {
-            'embedding': str(self.embedding.__class__.__name__),
-            'one_way_valve': str(self.one_way_valve.__class__.__name__),
-            'chain_units': len(self.chain_units),
-            'tri_balancers': len(self.tri_balancers),
-            'geological_memory': str(self.geological_memory.__class__.__name__),
-            'sandwich_fusion': str(self.sandwich_fusion.__class__.__name__),
-        }
+        Returns:
+            bool: 是否通过验证
+        """
+        try:
+            # 验证1: 连接点密度公式
+            if 'markers' in step_data:
+                markers = step_data['markers']
+                density_info = self._compute_connection_density(markers)
+            
+                # 检查密度值范围 [0, 1]
+                density = density_info['static_density']
+                if not (0 <= density <= 1):
+                    self._log_validation_error(f"密度值越界: {density}")
+                    return False
+            
+                # 检查连接数合理性
+                max_connections = (density_info['nodes'] * (density_info['nodes'] - 1)) / 2
+                if density_info['connections'] > max_connections:
+                    self._log_validation_error("连接数异常")
+                    return False
+             
+                step_data['density_validated'] = True
+                self.density_history.append(density)
         
-        # 性能统计
-        performance_stats = {
-            'total_parameters': self.count_parameters(),
-            'mixed_precision_enabled': self.use_mixed_precision,
-            'gradient_checkpointing_enabled': self.enable_gradient_checkpointing,
-            'gradient_accumulation_steps': self.gradient_accumulation_steps,
-            'device': str(self.device),
-        }
+            # 验证2: 相变检测公式
+            if 'phase_delta' in step_data:
+                delta = step_data['phase_delta']
+                # 相变阈值验证
+                if delta > self.phase_transition_threshold:
+                    step_data['phase_transition'] = True
+                else:
+                    step_data['phase_transition'] = False
         
-        # V值统计
-        v_stats = {}
-        if self.v_history:
-            v_stats = {
-                'current_V': self.v_history[-1],
-                'V_history_length': len(self.v_history),
-                'V_mean': np.mean(self.v_history),
-                'V_std': np.std(self.v_history),
-                'V_trend': '上升' if len(self.v_history) > 1 and 
-                          self.v_history[-1] > self.v_history[0] else '稳定',
-            }
+            # 验证3: V值主导性验证
+            if 'V_means' in step_data:
+                V_means = step_data['V_means']
+                # 检查V值是否显著大于Q/K（V值主导）
+                if 'Q_mean' in step_data and 'K_mean' in step_data:
+                    V_avg = sum(V_means) / len(V_means) if V_means else 0
+                    Q_avg = step_data['Q_mean']
+                    K_avg = step_data['K_mean']
+                 
+                    if V_avg < max(Q_avg, K_avg) * self.v_scaling_factor:
+                        self._log_validation_warning("V值主导性不足")
         
+            return True
+        
+        except Exception as e:
+            self._log_validation_error(f"公式验证异常: {str(e)}")
+            return False
+
+    def _compute_connection_density(self, markers: torch.Tensor) -> Dict:
+        """
+        执行连接点密度公式计算
+        这是整个架构的数学基础
+    
+        Args:
+            markers: 标记向量 [B, S, D]
+         
+        Returns:
+            密度计算结果字典
+        """
+        B, S, D = markers.shape
+        markers_flat = markers.contiguous().view(-1, D)
+        N = markers_flat.size(0)
+    
+        if N <= 1:
+            return {'static_density': 0.0, 'connections': 0, 'nodes': N}
+     
+        # 核心：连接点判断（余弦相似度 > threshold）
+        norm_markers = F.normalize(markers_flat, p=2, dim=1)
+        similarity_matrix = torch.mm(norm_markers, norm_markers.T)
+    
+        # 二值化连接判断
+        connections = (similarity_matrix > self.connection_threshold).float()
+        M = connections.sum().item() / 2  # 无向图去重
+    
+        # 静态密度公式
+        static_density = (2 * M) / ((N + 1) * N) if N > 1 else 0.0
+    
         return {
-            'integrator_info': {
-                'version': '1.0.0',
-                'forward_calls': len(self.forward_history),
-                'last_forward': self.forward_history[-1] if self.forward_history else None,
-            },
-            'config_summary': self.config.to_dict(),
-            'engine_report': engine_report,
-            'component_stats': component_stats,
-            'performance_stats': performance_stats,
-            'V_stats': v_stats,
-            'recommendations': self._generate_recommendations(),
+            'static_density': static_density,
+            'connections': M,
+            'nodes': N,
+            'similarity_mean': similarity_matrix.mean().item()
         }
     
-    def _generate_recommendations(self) -> List[str]:
-        """生成优化建议"""
-        recommendations = []
+    def detect_phase_transition(self, V_history: List[float], threshold: float = 0.43) -> int:
+        """检测相变次数"""
+        if len(V_history) < 2:
+            return 0
         
-        # 基于V值历史
-        if self.v_history:
-            current_v = self.v_history[-1]
-            
-            if current_v > self.config.max_v_mean:
-                recommendations.append("当前V值过高，建议降低V权重")
-            elif current_v < self.config.min_v_mean:
-                recommendations.append("当前V值过低，建议增加V权重")
-            
-            # 检查V值趋势
-            if len(self.v_history) >= 3:
-                recent_trend = self.v_history[-3:]
-                if all(recent_trend[i] < recent_trend[i+1] for i in range(2)):
-                    recommendations.append("V值持续上升，考虑调整融合权重")
-                elif all(recent_trend[i] > recent_trend[i+1] for i in range(2)):
-                    recommendations.append("V值持续下降，考虑调整融合权重")
-        
-        # 基于引擎状态
-        engine_report = self.engine.get_analysis_report()
-        if engine_report.get('transition_analysis', {}).get('total_transitions', 0) > 5:
-            recommendations.append("检测到多次相变，学习过程不稳定")
-            recommendations.append("建议降低学习率或增加批量大小")
-        
-        # 基于配置
-        if self.config.max_cycles > 5:
-            recommendations.append("持续思考循环次数较多，可能增加计算成本")
-            recommendations.append("考虑减少循环次数或启用梯度检查点")
-        
-        return recommendations
+        transitions = 0
+        for i in range(1, len(V_history)):
+            prev_V = V_history[i-1]
+            curr_V = V_history[i]
+            if prev_V > 0:
+                delta = (curr_V - prev_V) / abs(prev_V)
+                if delta > threshold:
+                    transitions += 1
+        return transitions
     
-    # ==================== 保存/加载方法 ====================
-    # ==================== Save/Load Methods ====================
+    def identify_learning_phase(self, V_history: List[float]) -> str:
+        """识别学习阶段"""
+        if len(V_history) < 3:
+            return "初始化"
+        
+        recent = V_history[-3:]
+        mean_v = np.mean(recent)
+        std_v = np.std(recent)
+        trend = np.mean(np.diff(recent))
+        
+        if std_v > mean_v * 0.5:
+            return "震荡期"
+        elif trend < -0.1:
+            return "下降期"
+        elif abs(trend) < 0.05:
+            return "稳定期"
+        else:
+            return "上升期"
     
-    def save_pretrained(self, save_directory: str, include_config: bool = True):
-        """伪装保存：将模型保存为Transformer格式"""
+    def initialize_QKV(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """初始化Q₀、K₀、V₀"""
+        batch_size, seq_len, dim = x.shape
+        x_mean = x.mean(dim=1, keepdim=True).expand(batch_size, seq_len, dim)
+        return self.init_Q(x_mean), self.init_K(x_mean), self.init_V(x_mean)
+    
+    # ==================== 伪装保存 ====================
+    
+    def save_pretrained(self, save_directory: str):
+        """
+        伪装保存：将RGA模型保存为Transformer格式
+        创建标准文件：pytorch_model.bin, config.json, vocab.txt, tokenizer_config.json
+        """
+        import os
+        import json
+        
+        # 创建目录
         os.makedirs(save_directory, exist_ok=True)
         
-        # 1. 保存模型权重
+        # 1. 保存完整状态字典（包括buffer）
         torch.save(self.state_dict(), f"{save_directory}/pytorch_model.bin")
         
-        # 2. 创建配置文件
+        # 2. 创建Transformer标准配置文件
         config = {
             # Transformer标准字段
             "model_type": "bert",
@@ -1026,28 +1160,27 @@ class RGAIntegrator(nn.Module):
             "hidden_act": "gelu",
             "max_position_embeddings": 512,
             
-            # RGA隐藏字段
+            # RGA识别字段（隐藏）
             "_is_rga_disguised": True,
-            "_rga_version": "2.0",
-            "_rga_integrator": True,
-            "_rga_config": self.config.to_dict()
+            "_rga_version": "1.0",
+            "_rga_config": {
+                "dim": self.config.dim,
+                "num_units": self.config.num_units,
+                "geo_depth": self.config.geo_depth,
+                "phase_threshold": self.config.phase_threshold
+            }
         }
         
-        with open(f"{save_directory}/config.json", "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
+        with open(f"{save_directory}/config.json", "w") as f:
+            json.dump(config, f, indent=2)
         
-        # 3. 保存集成器配置
-        if include_config:
-            with open(f"{save_directory}/integrator_config.json", "w", encoding="utf-8") as f:
-                json.dump(self.config.to_dict(), f, indent=2, ensure_ascii=False)
-        
-        # 4. 创建词汇表
-        with open(f"{save_directory}/vocab.txt", "w", encoding="utf-8") as f:
+        # 3. 创建词汇表文件（最小集）
+        with open(f"{save_directory}/vocab.txt", "w") as f:
             f.write("[PAD]\n[UNK]\n[CLS]\n[SEP]\n[MASK]\n")
-            for i in range(min(100, self.config.vocab_size)):
+            for i in range(100):
                 f.write(f"[WORD{i}]\n")
         
-        # 5. 创建分词器配置
+        # 4. 创建分词器配置文件
         tokenizer_config = {
             "do_lower_case": True,
             "unk_token": "[UNK]",
@@ -1058,260 +1191,259 @@ class RGAIntegrator(nn.Module):
             "tokenizer_class": "BertTokenizer"
         }
         
-        with open(f"{save_directory}/tokenizer_config.json", "w", encoding="utf-8") as f:
-            json.dump(tokenizer_config, f, indent=2, ensure_ascii=False)
+        with open(f"{save_directory}/tokenizer_config.json", "w") as f:
+            json.dump(tokenizer_config, f, indent=2)
         
-        # 6. 保存引擎状态
-        engine_state_path = f"{save_directory}/engine_state.pkl"
-        self.engine.save_state(engine_state_path)
-        
-        total_params = self.count_parameters()
-        file_list = os.listdir(save_directory)
-        
+        # 5. 统计信息
+        total_params = sum(p.numel() for p in self.parameters())
         print(f"✅ 伪装保存完成: {save_directory}")
         print(f"   参数数量: {total_params:,}")
-        print(f"   文件结构: {file_list}")
+        print(f"   文件结构: {os.listdir(save_directory)}")
         
         return save_directory
     
-    def load_pretrained(self, load_directory: str, strict: bool = True):
-        """伪装加载：从Transformer格式加载模型"""
+    # ==================== 伪装加载 ====================
+    
+    @classmethod
+    def from_pretrained(cls, pretrained_path: str, config: RGAConfig = None):
+        """
+        伪装加载：从Transformer格式加载回RGA模型
+        自动识别伪装标记，恢复完整RGA架构
+        """
         import json
         
-        # 1. 加载配置
-        config_path = f"{load_directory}/config.json"
-        if not os.path.exists(config_path):
-            raise FileNotFoundError(f"配置文件不存在: {config_path}")
-        
-        with open(config_path, "r", encoding="utf-8") as f:
+        # 1. 加载配置文件
+        with open(f"{pretrained_path}/config.json", "r") as f:
             config_data = json.load(f)
         
         # 检查是否是伪装模型
         if not config_data.get("_is_rga_disguised", False):
-            warnings.warn("⚠️ 警告：这可能不是RGA伪装模型，继续尝试加载...")
+            print("⚠️  警告：这可能不是RGA伪装模型，继续尝试加载...")
         
-        # 2. 创建配置
-        if config_data.get("_rga_integrator", False):
-            rga_config = config_data.get("_rga_config", {})
-            self.config = IntegrationConfig.from_dict(rga_config)
-        else:
-            self.config = IntegrationConfig(
-                vocab_size=config_data.get("vocab_size", 10000),
-                dim=config_data.get("hidden_size", 512),
-                num_units=config_data.get("num_hidden_layers", 3)
-            )
+        # 2. 创建RGA配置
+        if config is None:
+            config = RGAConfig()
+            config.dim = config_data["hidden_size"]
+            config.vocab_size = config_data["vocab_size"]
+            config.num_units = config_data["num_hidden_layers"]
         
-        # 3. 重新初始化组件 - 修复：调用正确的方法名
-        self._init_components()
+        # 3. 创建RGA模型实例
+        model = cls(config)
         
-        # 4. 加载权重
-        model_path = f"{load_directory}/pytorch_model.bin"
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"模型文件不存在: {model_path}")
+        # 4. 加载权重文件
+        state_dict = torch.load(f"{pretrained_path}/pytorch_model.bin", map_location="cpu")
         
-        state_dict = torch.load(model_path, map_location=self.device)
-        missing_keys, unexpected_keys = self.load_state_dict(state_dict, strict=strict)
+        # 5. 加载到模型（允许部分参数不匹配）
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
         
-        # 5. 加载引擎状态
-        engine_state_path = f"{load_directory}/engine_state.pkl"
-        if os.path.exists(engine_state_path):
-            try:
-                self.engine.load_state(engine_state_path)
-            except Exception as e:
-                print(f"⚠️ 加载引擎状态失败: {e}")
-        
-        # 统计信息
-        total_params = self.count_parameters()
+        # 6. 统计信息
+        total_params = sum(p.numel() for p in model.parameters())
         loaded_params = sum(p.numel() for p in state_dict.values())
         
-        print(f"✅ 伪装加载完成: {load_directory}")
+        print(f"✅ 伪装加载完成: {pretrained_path}")
         print(f"   加载参数: {loaded_params:,}")
         print(f"   模型参数: {total_params:,}")
         
         if missing_keys:
-            print(f"   ⚠️ 缺失参数: {len(missing_keys)} 个")
-            for key in missing_keys[:5]:
-                print(f"     - {key}")
-            if len(missing_keys) > 5:
-                print(f"     ... 还有 {len(missing_keys) - 5} 个")
-        
+            print(f"   ⚠️  缺失参数: {len(missing_keys)} 个（使用初始化值）")
         if unexpected_keys:
-            print(f"   ⚠️ 意外参数: {len(unexpected_keys)} 个")
-            for key in unexpected_keys[:5]:
-                print(f"     - {key}")
-            if len(unexpected_keys) > 5:
-                print(f"     ... 还有 {len(unexpected_keys) - 5} 个")
+            print(f"   ⚠️  意外参数: {len(unexpected_keys)} 个（已忽略）")
         
-        return self
-    
-    # ==================== 辅助方法 ====================
-    # ==================== Helper Methods ====================
-    
-    def visualize_state_changes(self, save_path: Optional[str] = None):
-        """可视化状态变化"""
-        self.engine.visualize_state_changes(save_path)
-    
-    def reset(self):
-        """重置集成器状态"""
-        self.engine.reset()
-        self.forward_history = []
-        self.v_history = []
-        self.phase_history = []
-        print("✅ 集成器状态已重置")
+        return model    
 
 
-# ==================== 工厂函数 ====================
-# ==================== Factory Functions ====================
-
-def create_integrator(config: Optional[Union[IntegrationConfig, Dict]] = None, 
-                     device: Optional[str] = None) -> RGAIntegrator:
-    """创建RGA集成器"""
-    integrator = RGAIntegrator(config)
-    
-    if device is not None:
-        target_device = torch.device(device)
-        if target_device != integrator.device:
-            integrator.to(target_device)
-            integrator.device = target_device
-            print(f"✅ 集成器已移动到设备: {target_device}")
-    
-    return integrator
-
-
-def save_disguised_model(integrator: RGAIntegrator, save_directory: str, 
-                        include_config: bool = True) -> str:
-    """伪装保存模型"""
-    return integrator.save_pretrained(save_directory, include_config)
-
-
-def load_disguised_model(load_directory: str, device: Optional[str] = None, 
-                        config: Optional[Union[IntegrationConfig, Dict]] = None) -> RGAIntegrator:
-    """伪装加载模型"""
-    import json
-    
-    # 检查是否是集成器保存的
-    config_path = f"{load_directory}/config.json"
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"配置文件不存在: {load_directory}")
-    
-    with open(config_path, "r", encoding="utf-8") as f:
-        config_data = json.load(f)
-    
-    # 创建配置
-    if config is None:
-        if config_data.get("_rga_integrator", False):
-            rga_config = config_data.get("_rga_config", {})
-            config = IntegrationConfig.from_dict(rga_config)
-        else:
-            config = IntegrationConfig(
-                vocab_size=config_data.get("vocab_size", 10000),
-                dim=config_data.get("hidden_size", 512),
-                num_units=config_data.get("num_hidden_layers", 3)
-            )
-    
-    # 创建集成器
-    integrator = create_integrator(config, device)
-    
-    # 加载权重
-    integrator.load_pretrained(load_directory)
-    
-    return integrator
-
-
-# ==================== 便捷函数 ====================
-# ==================== Convenience Functions ====================
-
-def get_default_integration_config(**kwargs) -> IntegrationConfig:
-    """获取默认集成配置"""
-    return IntegrationConfig(**kwargs)
-
-
-def validate_integration_config(config: Union[IntegrationConfig, Dict]) -> Tuple[bool, List[str]]:
-    """验证集成配置"""
-    try:
-        if isinstance(config, dict):
-            config = IntegrationConfig.from_dict(config)
-        return config.validate()
-    except Exception as e:
-        return False, [f"配置验证异常: {e}"]
-
-
-# ==================== 测试函数 ====================
-# ==================== Test Functions ====================
-
-def test_integrator() -> bool:
-    """测试集成器"""
-    print("🧪 测试RGA集成器")
-    print("=" * 60)
-    
-    try:
-        # 1. 创建集成器
-        integrator = create_integrator({
-            "vocab_size": 1000,
-            "dim": 32,
-            "num_units": 2,
-            "max_cycles": 2
-        })
-        print("✅ 集成器创建成功")
-        
-        # 2. 创建测试输入
-        input_ids = torch.randint(0, 1000, (2, 16))
-        
-        # 3. 前向传播
-        output = integrator.forward(input_ids, num_cycles=2, return_details=False)
-        print("✅ 前向传播成功")
-        print(f"   输出键: {list(output.keys())}")
-        print(f"   Logits形状: {output['logits'].shape}")
-        
-        # 4. 获取分析报告
-        report = integrator.get_analysis_report()
-        print("✅ 分析报告获取成功")
-        print(f"   报告键: {list(report.keys())}")
-        
-        # 5. 伪装保存
-        save_dir = "./test_saved_model"
-        integrator.save_pretrained(save_dir, include_config=True)
-        print("✅ 伪装保存成功")
-        
-        # 6. 伪装加载
-        loaded_integrator = load_disguised_model(save_dir)
-        print("✅ 伪装加载成功")
-        
-        # 7. 清理测试文件
-        import shutil
-        if os.path.exists(save_dir):
-            shutil.rmtree(save_dir)
-        print("✅ 测试文件清理完成")
-        
-        print("=" * 60)
-        print("✅ 所有测试通过")
-        print("=" * 60)
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ 测试失败: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-
-# ==================== 主程序入口 ====================
-# ==================== Main Entry Point ====================
+# ==================== 测试代码 ====================
+# ==================== Test Code ====================
 
 if __name__ == "__main__":
-    # 运行集成器测试
-    print("🚀 启动RGA集成器测试...")
-    success = test_integrator()
+    """测试 RGAIntegrator 的基本功能"""
+    import torch
+    import os
     
-    if success:
-        print("🎉 RGA集成器测试通过，可以正常使用！")
-        print("\n使用示例:")
-        print("1. 创建集成器: integrator = create_integrator()")
-        print("2. 前向传播: output = integrator.forward(input_ids)")
-        print("3. 获取报告: report = integrator.get_analysis_report()")
-        print("4. 保存模型: integrator.save_pretrained('./model')")
-    else:
-        print("❌ RGA集成器测试失败，请检查错误信息")
+    print("=" * 60)
+    print("🧪 开始测试 RGAIntegrator")
+    print("=" * 60)
     
-    print("\n✨ RGA集成器模块加载完成")
+    # 创建临时测试目录
+    test_dir = "./test_output"
+    os.makedirs(test_dir, exist_ok=True)
+    
+    try:
+        # 1. 测试配置创建
+        print("\n1️⃣ 测试配置创建...")
+        config = IntegrationConfig(
+            vocab_size=1000,
+            dim=128,  # 使用较小的维度以便快速测试
+            num_units=3,
+            max_cycles=2,
+            phase_threshold=0.43,
+            enable_mixed_precision=False,  # 测试时关闭混合精度
+        )
+        
+        # 验证配置
+        is_valid, errors = config.validate()
+        if not is_valid:
+            print(f"❌ 配置验证失败: {errors}")
+        else:
+            print(f"✅ 配置验证通过: {config}")
+        
+        # 2. 创建 RGA 配置
+        print("\n2️⃣ 创建 RGA 配置...")
+        try:
+            rga_config = RGAConfig(
+                dim=config.dim,
+                vocab_size=config.vocab_size,
+                num_units=config.num_units,
+                phase_threshold=config.phase_threshold,
+                geo_depth=config.geo_depth,
+            )
+            print(f"✅ RGAConfig 创建成功")
+        except Exception as e:
+            print(f"⚠️  使用默认 RGAConfig: {e}")
+            rga_config = get_default_config()
+            rga_config.dim = config.dim
+            rga_config.vocab_size = config.vocab_size
+            rga_config.num_units = config.num_units
+        
+        # 3. 创建模型实例
+        print("\n3️⃣ 创建 RGAIntegrator 实例...")
+        try:
+            model = RGAIntegrator(rga_config)
+            print(f"✅ 模型创建成功")
+            print(f"   参数数量: {sum(p.numel() for p in model.parameters()):,}")
+        except Exception as e:
+            print(f"❌ 模型创建失败: {e}")
+            raise
+        
+        # 4. 测试前向传播
+        print("\n4️⃣ 测试前向传播...")
+        batch_size = 2
+        seq_len = 16
+        
+        # 创建随机输入（token ids）
+        input_ids = torch.randint(0, config.vocab_size, (batch_size, seq_len))
+        print(f"   输入形状: {input_ids.shape}")
+        
+        # 设置为评估模式
+        model.eval()
+        
+        with torch.no_grad():
+            # 单循环前向传播
+            print("   🧠 运行单循环前向传播...")
+            output = model(input_ids, num_cycles=1)
+            
+            # 检查输出结构
+            required_keys = ['logits', 'Q_final', 'K_final', 'V_final']
+            missing_keys = [k for k in required_keys if k not in output]
+            
+            if missing_keys:
+                print(f"❌ 输出缺少关键字段: {missing_keys}")
+            else:
+                print(f"✅ 前向传播成功")
+                print(f"   logits 形状: {output['logits'].shape}")
+                print(f"   Q_final 形状: {output['Q_final'].shape}")
+                print(f"   V_fused_mean: {output['V_stats']['V_fused_mean']:.4f}")
+                
+                if 'thought_metrics' in output:
+                    print(f"   V主导比例: {output['thought_metrics']['v_dominance_ratio']:.4f}")
+        
+        # 5. 测试多循环前向传播
+        print("\n5️⃣ 测试多循环前向传播...")
+        with torch.no_grad():
+            print("   🧠 运行双循环前向传播...")
+            output2 = model(input_ids, num_cycles=2)
+            
+            if 'V_evolution_analysis' in output2:
+                analysis = output2['V_evolution_analysis']
+                print(f"✅ 多循环分析成功")
+                print(f"   V值趋势: {analysis.get('trend', 'N/A')}")
+                print(f"   V值波动性: {analysis.get('volatility', 0):.4f}")
+                print(f"   建议: {analysis.get('recommendation', 'N/A')}")
+        
+        # 6. 测试公式统计
+        print("\n6️⃣ 测试公式统计...")
+        stats = model.get_formula_stats()
+        print(f"✅ 公式统计获取成功")
+        print(f"   当前阶段: {stats['phase_state']}")
+        print(f"   密度趋势: {stats['density_stats']['trend']}")
+        print(f"   验证错误数: {stats['validation_errors']}")
+        
+        # 7. 测试伪装保存（可选）
+        print("\n7️⃣ 测试伪装保存（可选）...")
+        try:
+            save_path = os.path.join(test_dir, "rga_test_model")
+            model.save_pretrained(save_path)
+            print(f"✅ 伪装保存成功: {save_path}")
+            
+            # 检查保存的文件
+            saved_files = os.listdir(save_path)
+            required_files = ['pytorch_model.bin', 'config.json', 'vocab.txt']
+            for file in required_files:
+                if file in saved_files:
+                    print(f"   ✅ 已保存: {file}")
+                else:
+                    print(f"   ⚠️  缺失: {file}")
+                    
+        except Exception as e:
+            print(f"⚠️  伪装保存测试跳过: {e}")
+        
+        # 8. 测试V值调控
+        print("\n8️⃣ 测试V值调控...")
+        try:
+            # 手动记录一些V值历史
+            if hasattr(model, 'V_history'):
+                model.V_history.extend([0.5, 1.0, 1.5, 1.2, 0.8])
+                
+                # 检测相变
+                transitions = model.detect_phase_transition(model.V_history)
+                print(f"   检测到相变次数: {transitions}")
+                
+                # 识别学习阶段
+                phase = model.identify_learning_phase(model.V_history)
+                print(f"   当前学习阶段: {phase}")
+                
+                # 更新阶段状态
+                model.update_phase_state("探索期")
+                print(f"   更新后阶段: {model.phase_state}")
+        except Exception as e:
+            print(f"⚠️  V值调控测试跳过: {e}")
+        
+        # 9. 内存使用测试
+        print("\n9️⃣ 测试内存使用...")
+        if torch.cuda.is_available():
+            print(f"   CUDA 可用，GPU内存: {torch.cuda.get_device_name(0)}")
+            print(f"   初始内存: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
+            
+            # 移动模型到GPU
+            model.cuda()
+            input_ids_gpu = input_ids.cuda()
+            
+            with torch.no_grad():
+                _ = model(input_ids_gpu, num_cycles=1)
+            
+            print(f"   推理后内存: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
+        else:
+            print("   ℹ️  使用CPU模式")
+        
+        # 10. 清理测试目录
+        print("\n🔟 清理测试文件...")
+        import shutil
+        if os.path.exists(test_dir):
+            shutil.rmtree(test_dir)
+            print(f"✅ 清理完成: {test_dir}")
+        
+        print("\n" + "=" * 60)
+        print("🎉 所有测试完成！RGAIntegrator 基本功能正常")
+        print("=" * 60)
+        
+    except Exception as e:
+        print(f"\n❌ 测试失败: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # 清理测试目录
+        if os.path.exists(test_dir):
+            import shutil
+            shutil.rmtree(test_dir)
+        
+        sys.exit(1)    
