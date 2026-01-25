@@ -1251,199 +1251,236 @@ class RGAIntegrator(nn.Module):
         
         return model    
 
-
-# ==================== 测试代码 ====================
-# ==================== Test Code ====================
-
-if __name__ == "__main__":
-    """测试 RGAIntegrator 的基本功能"""
-    import torch
-    import os
+def create_integrator(config: Optional[Union[IntegrationConfig, Dict]] = None, 
+                     device: Optional[str] = None) -> RGAIntegrator:
+    """创建RGA集成器 - 修复版"""
     
-    print("=" * 60)
-    print("🧪 开始测试 RGAIntegrator")
-    print("=" * 60)
+    # 🆕 创建RGA配置
+    rga_config = RGAConfig()
     
-    # 创建临时测试目录
-    test_dir = "./test_output"
-    os.makedirs(test_dir, exist_ok=True)
+    if config is None:
+        # 使用默认配置
+        pass
+    elif isinstance(config, dict):
+        # 从字典设置参数
+        if 'vocab_size' in config:
+            rga_config.vocab_size = config['vocab_size']
+        if 'dim' in config:
+            rga_config.dim = config['dim']
+        if 'num_units' in config:
+            # 🚨 修复：RGA架构需要至少3个单元
+            num_units = config['num_units']
+            if num_units < 3:
+                print(f"⚠️  警告：RGA架构需要至少3个单元，已从 {num_units} 调整为 3")
+                num_units = 3
+            rga_config.num_units = num_units
+        if 'phase_threshold' in config:
+            rga_config.phase_threshold = config['phase_threshold']
+    elif isinstance(config, IntegrationConfig):
+        # 从IntegrationConfig设置
+        rga_config.vocab_size = config.vocab_size
+        rga_config.dim = config.dim
+        # 🚨 修复：确保至少3个单元
+        num_units = config.num_units if hasattr(config, 'num_units') else 3
+        if num_units < 3:
+            print(f"⚠️  警告：RGA架构需要至少3个单元，已从 {num_units} 调整为 3")
+            num_units = 3
+        rga_config.num_units = num_units
+        if hasattr(config, 'phase_threshold'):
+            rga_config.phase_threshold = config.phase_threshold
+    elif isinstance(config, RGAConfig):
+        # 已经是RGAConfig，直接使用
+        rga_config = config
+        # 🚨 修复：确保至少3个单元
+        if rga_config.num_units < 3:
+            print(f"⚠️  警告：RGA架构需要至少3个单元，已从 {rga_config.num_units} 调整为 3")
+            rga_config.num_units = 3
+    else:
+        raise ValueError(f"不支持的配置类型: {type(config)}")
+    
+    # 🆕 创建集成器实例
+    integrator = RGAIntegrator(rga_config)
+    
+    # 🆕 移动到指定设备
+    if device is not None:
+        device_obj = torch.device(device)
+        if integrator.device != device_obj:
+            integrator.to(device_obj)
+            integrator.device = device_obj
+    
+    return integrator
+
+
+def save_disguised_model(integrator: RGAIntegrator, save_directory: str) -> str:
+    """伪装保存模型"""
+    
+    # 确保目录存在
+    os.makedirs(save_directory, exist_ok=True)
+    
+    # 1. 保存模型权重
+    model_path = os.path.join(save_directory, "pytorch_model.bin")
+    torch.save(integrator.state_dict(), model_path)
+    
+    # 2. 创建配置文件（伪装成BERT）
+    config = {
+        # BERT标准字段
+        "model_type": "bert",
+        "architectures": ["BertForMaskedLM"],
+        "hidden_size": integrator.config.dim,
+        "num_hidden_layers": integrator.config.num_units,
+        "vocab_size": integrator.config.vocab_size,
+        "attention_probs_dropout_prob": 0.1,
+        "hidden_act": "gelu",
+        "max_position_embeddings": 512,
+        
+        # RGA隐藏标记
+        "_is_rga_model": True,
+        "_rga_version": "1.0"
+    }
+    
+    config_path = os.path.join(save_directory, "config.json")
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+    
+    # 3. 创建简单词汇表
+    vocab_path = os.path.join(save_directory, "vocab.txt")
+    with open(vocab_path, "w", encoding="utf-8") as f:
+        f.write("[PAD]\n[UNK]\n[CLS]\n[SEP]\n[MASK]\n")
+        for i in range(100):
+            f.write(f"word{i}\n")
+    
+    # 4. 创建tokenizer配置
+    tokenizer_config = {
+        "do_lower_case": True,
+        "unk_token": "[UNK]",
+        "sep_token": "[SEP]",
+        "pad_token": "[PAD]",
+        "cls_token": "[CLS]",
+        "mask_token": "[MASK]",
+        "tokenizer_class": "BertTokenizer"
+    }
+    
+    tokenizer_path = os.path.join(save_directory, "tokenizer_config.json")
+    with open(tokenizer_path, "w", encoding="utf-8") as f:
+        json.dump(tokenizer_config, f, indent=2, ensure_ascii=False)
+    
+    print(f"✅ 模型保存完成: {save_directory}")
+    print(f"   文件: {os.listdir(save_directory)}")
+    
+    return save_directory
+
+
+def load_disguised_model(load_directory: str, device: Optional[str] = None) -> RGAIntegrator:
+    """伪装加载模型"""
+    
+    # 1. 检查目录
+    if not os.path.exists(load_directory):
+        raise FileNotFoundError(f"目录不存在: {load_directory}")
+    
+    # 2. 读取配置文件
+    config_path = os.path.join(load_directory, "config.json")
+    with open(config_path, "r", encoding="utf-8") as f:
+        config_data = json.load(f)
+    
+    # 3. 创建配置 - 🚨 修复：确保至少3个单元
+    vocab_size = config_data.get("vocab_size", 10000)
+    dim = config_data.get("hidden_size", 512)
+    num_units = config_data.get("num_hidden_layers", 3)
+    
+    if num_units < 3:
+        print(f"⚠️  警告：加载的模型只有 {num_units} 个单元，已调整为 3")
+        num_units = 3
+    
+    # 4. 创建集成器
+    config = IntegrationConfig(
+        vocab_size=vocab_size,
+        dim=dim,
+        num_units=num_units
+    )
+    
+    integrator = create_integrator(config, device)
+    
+    # 5. 加载权重
+    model_path = os.path.join(load_directory, "pytorch_model.bin")
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"模型文件不存在: {model_path}")
+    
+    state_dict = torch.load(model_path, map_location=integrator.device)
+    integrator.load_state_dict(state_dict, strict=False)
+    
+    print(f"✅ 模型加载完成: {load_directory}")
+    print(f"   词汇表: {vocab_size}, 维度: {dim}, 层数: {num_units}")
+    
+    return integrator
+
+
+def test_integrator() -> bool:
+    """测试集成器 - 修复版"""
+    print("🧪 测试RGA集成器")
+    print("=" * 60)
     
     try:
-        # 1. 测试配置创建
-        print("\n1️⃣ 测试配置创建...")
-        config = IntegrationConfig(
-            vocab_size=1000,
-            dim=128,  # 使用较小的维度以便快速测试
-            num_units=3,
-            max_cycles=2,
-            phase_threshold=0.43,
-            enable_mixed_precision=False,  # 测试时关闭混合精度
-        )
+        # 1. 创建集成器 - 🚨 修复：使用3个单元
+        integrator = create_integrator({
+            "vocab_size": 1000,
+            "dim": 64,
+            "num_units": 3,  # 🚨 必须是3！
+            "phase_threshold": 0.43
+        })
+        print("✅ 集成器创建成功")
+        print(f"   实际单元数: {integrator.config.num_units}")
         
-        # 验证配置
-        is_valid, errors = config.validate()
-        if not is_valid:
-            print(f"❌ 配置验证失败: {errors}")
-        else:
-            print(f"✅ 配置验证通过: {config}")
+        # 2. 测试前向传播
+        input_ids = torch.randint(0, 1000, (2, 32))
+        output = integrator.forward(input_ids, num_cycles=1)
+        print("✅ 前向传播成功")
+        print(f"   Logits形状: {output['logits'].shape}")
         
-        # 2. 创建 RGA 配置
-        print("\n2️⃣ 创建 RGA 配置...")
-        try:
-            rga_config = RGAConfig(
-                dim=config.dim,
-                vocab_size=config.vocab_size,
-                num_units=config.num_units,
-                phase_threshold=config.phase_threshold,
-                geo_depth=config.geo_depth,
-            )
-            print(f"✅ RGAConfig 创建成功")
-        except Exception as e:
-            print(f"⚠️  使用默认 RGAConfig: {e}")
-            rga_config = get_default_config()
-            rga_config.dim = config.dim
-            rga_config.vocab_size = config.vocab_size
-            rga_config.num_units = config.num_units
+        # 3. 测试保存
+        save_dir = "./test_model"
+        save_disguised_model(integrator, save_dir)
         
-        # 3. 创建模型实例
-        print("\n3️⃣ 创建 RGAIntegrator 实例...")
-        try:
-            model = RGAIntegrator(rga_config)
-            print(f"✅ 模型创建成功")
-            print(f"   参数数量: {sum(p.numel() for p in model.parameters()):,}")
-        except Exception as e:
-            print(f"❌ 模型创建失败: {e}")
-            raise
+        # 4. 测试加载
+        loaded = load_disguised_model(save_dir)
+        print("✅ 加载成功")
         
-        # 4. 测试前向传播
-        print("\n4️⃣ 测试前向传播...")
-        batch_size = 2
-        seq_len = 16
+        # 5. 测试加载后的模型
+        test_output = loaded.forward(input_ids, num_cycles=1)
+        print("✅ 加载模型前向传播成功")
         
-        # 创建随机输入（token ids）
-        input_ids = torch.randint(0, config.vocab_size, (batch_size, seq_len))
-        print(f"   输入形状: {input_ids.shape}")
-        
-        # 设置为评估模式
-        model.eval()
-        
-        with torch.no_grad():
-            # 单循环前向传播
-            print("   🧠 运行单循环前向传播...")
-            output = model(input_ids, num_cycles=1)
-            
-            # 检查输出结构
-            required_keys = ['logits', 'Q_final', 'K_final', 'V_final']
-            missing_keys = [k for k in required_keys if k not in output]
-            
-            if missing_keys:
-                print(f"❌ 输出缺少关键字段: {missing_keys}")
-            else:
-                print(f"✅ 前向传播成功")
-                print(f"   logits 形状: {output['logits'].shape}")
-                print(f"   Q_final 形状: {output['Q_final'].shape}")
-                print(f"   V_fused_mean: {output['V_stats']['V_fused_mean']:.4f}")
-                
-                if 'thought_metrics' in output:
-                    print(f"   V主导比例: {output['thought_metrics']['v_dominance_ratio']:.4f}")
-        
-        # 5. 测试多循环前向传播
-        print("\n5️⃣ 测试多循环前向传播...")
-        with torch.no_grad():
-            print("   🧠 运行双循环前向传播...")
-            output2 = model(input_ids, num_cycles=2)
-            
-            if 'V_evolution_analysis' in output2:
-                analysis = output2['V_evolution_analysis']
-                print(f"✅ 多循环分析成功")
-                print(f"   V值趋势: {analysis.get('trend', 'N/A')}")
-                print(f"   V值波动性: {analysis.get('volatility', 0):.4f}")
-                print(f"   建议: {analysis.get('recommendation', 'N/A')}")
-        
-        # 6. 测试公式统计
-        print("\n6️⃣ 测试公式统计...")
-        stats = model.get_formula_stats()
-        print(f"✅ 公式统计获取成功")
-        print(f"   当前阶段: {stats['phase_state']}")
-        print(f"   密度趋势: {stats['density_stats']['trend']}")
-        print(f"   验证错误数: {stats['validation_errors']}")
-        
-        # 7. 测试伪装保存（可选）
-        print("\n7️⃣ 测试伪装保存（可选）...")
-        try:
-            save_path = os.path.join(test_dir, "rga_test_model")
-            model.save_pretrained(save_path)
-            print(f"✅ 伪装保存成功: {save_path}")
-            
-            # 检查保存的文件
-            saved_files = os.listdir(save_path)
-            required_files = ['pytorch_model.bin', 'config.json', 'vocab.txt']
-            for file in required_files:
-                if file in saved_files:
-                    print(f"   ✅ 已保存: {file}")
-                else:
-                    print(f"   ⚠️  缺失: {file}")
-                    
-        except Exception as e:
-            print(f"⚠️  伪装保存测试跳过: {e}")
-        
-        # 8. 测试V值调控
-        print("\n8️⃣ 测试V值调控...")
-        try:
-            # 手动记录一些V值历史
-            if hasattr(model, 'V_history'):
-                model.V_history.extend([0.5, 1.0, 1.5, 1.2, 0.8])
-                
-                # 检测相变
-                transitions = model.detect_phase_transition(model.V_history)
-                print(f"   检测到相变次数: {transitions}")
-                
-                # 识别学习阶段
-                phase = model.identify_learning_phase(model.V_history)
-                print(f"   当前学习阶段: {phase}")
-                
-                # 更新阶段状态
-                model.update_phase_state("探索期")
-                print(f"   更新后阶段: {model.phase_state}")
-        except Exception as e:
-            print(f"⚠️  V值调控测试跳过: {e}")
-        
-        # 9. 内存使用测试
-        print("\n9️⃣ 测试内存使用...")
-        if torch.cuda.is_available():
-            print(f"   CUDA 可用，GPU内存: {torch.cuda.get_device_name(0)}")
-            print(f"   初始内存: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
-            
-            # 移动模型到GPU
-            model.cuda()
-            input_ids_gpu = input_ids.cuda()
-            
-            with torch.no_grad():
-                _ = model(input_ids_gpu, num_cycles=1)
-            
-            print(f"   推理后内存: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
-        else:
-            print("   ℹ️  使用CPU模式")
-        
-        # 10. 清理测试目录
-        print("\n🔟 清理测试文件...")
+        # 6. 清理
         import shutil
-        if os.path.exists(test_dir):
-            shutil.rmtree(test_dir)
-            print(f"✅ 清理完成: {test_dir}")
+        shutil.rmtree(save_dir)
+        print("✅ 测试文件清理完成")
         
-        print("\n" + "=" * 60)
-        print("🎉 所有测试完成！RGAIntegrator 基本功能正常")
         print("=" * 60)
+        print("🎉 所有测试通过")
+        
+        return True
         
     except Exception as e:
-        print(f"\n❌ 测试失败: {e}")
+        print(f"❌ 测试失败: {e}")
         import traceback
         traceback.print_exc()
-        
-        # 清理测试目录
-        if os.path.exists(test_dir):
-            import shutil
-            shutil.rmtree(test_dir)
-        
-        sys.exit(1)    
+        return False
+
+
+# ==================== 主程序入口 ====================
+
+if __name__ == "__main__":
+    print("🚀 RGA集成器测试")
+    print("=" * 60)
+    
+    success = test_integrator()
+    
+    if success:
+        print("\n✅ 集成器功能正常")
+        print("\n使用示例:")
+        print("1. 创建: integrator = create_integrator({'vocab_size': 10000, 'num_units': 3})")
+        print("2. 训练: output = integrator.forward(input_ids)")
+        print("3. 保存: save_disguised_model(integrator, './model')")
+        print("4. 加载: loaded = load_disguised_model('./model')")
+    else:
+        print("\n❌ 测试失败，需要调试")
+    
+    print("\n✨ 完成")

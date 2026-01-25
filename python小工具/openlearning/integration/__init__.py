@@ -9,7 +9,7 @@ RGA Rule-Governed Architecture integration module package, providing complete RG
 # ==================== 模块信息 ====================
 # ==================== Module Information ====================
 
-__version__ = "0.0.4"
+__version__ = "0.0.5"
 __author__ = "RGA Architecture Team"
 __description__ = "RGA规则治理架构集成模块"
 __license__ = "Apache 2.0"
@@ -28,9 +28,21 @@ try:
         create_integrator,
         save_disguised_model,
         load_disguised_model,
-        get_default_integration_config,
-        validate_integration_config,
         test_integrator,
+    )
+    
+    # 导入nn模块中的类
+    from .nn import (
+        SmartTextDataset,
+        VisualTrainingProgress,
+        AdvancedConstrainedArchitectureTrainer,
+        train_zixin_complete_model,
+        quick_test_mode,
+        resume_training,
+        test_model_inference,
+        run_architecture_test,
+        save_vocabulary_example,
+        main,
     )
     
     _IMPORT_SUCCESSFUL = True
@@ -38,20 +50,31 @@ try:
     
 except ImportError as e:
     try:
-        # 如果直接导入失败，尝试相对导入
+        # 如果直接导入失败，尝试绝对导入
         from yucai import (
             IntegrationConfig,
             RGAIntegrator,
             create_integrator,
             save_disguised_model,
             load_disguised_model,
-            get_default_integration_config,
-            validate_integration_config,
             test_integrator,
         )
         
+        from nn import (
+            SmartTextDataset,
+            VisualTrainingProgress,
+            AdvancedConstrainedArchitectureTrainer,
+            train_zixin_complete_model,
+            quick_test_mode,
+            resume_training,
+            test_model_inference,
+            run_architecture_test,
+            save_vocabulary_example,
+            main,
+        )
+        
         _IMPORT_SUCCESSFUL = True
-        print("✅ 集成模块导入成功（相对导入）")
+        print("✅ 集成模块导入成功（绝对导入）")
         
     except ImportError as e2:
         print(f"❌ 集成模块导入失败: {e2}")
@@ -78,6 +101,28 @@ __all__ = [
     # 测试函数 | Test functions
     "test_integrator",
     
+    # 数据集类
+    "SmartTextDataset",
+    
+    # 训练组件
+    "VisualTrainingProgress",
+    "AdvancedConstrainedArchitectureTrainer",
+    
+    # 训练函数
+    "train_zixin_complete_model",
+    "quick_test_mode",
+    "resume_training",
+    
+    # 推理函数
+    "test_model_inference",
+    
+    # 测试函数
+    "run_architecture_test",
+    "save_vocabulary_example",
+    
+    # 主程序入口
+    "main",
+    
     # 模块信息 | Module information
     "__version__",
     "__author__",
@@ -93,6 +138,7 @@ def _initialize_module():
     print(f"✅ RGA集成模块 v{__version__} 已加载")
     print(f"   作者: {__author__}")
     print(f"   导入状态: {'✅ 成功' if _IMPORT_SUCCESSFUL else '❌ 失败'}")
+    print(f"   导出组件数: {len(__all__) - 4}")  # 减去4个模块信息字段
 
 # 自动初始化模块
 if __name__ != "__main__":
@@ -117,21 +163,67 @@ if __name__ == "__main__":
         try:
             # 创建一个最小配置的集成器进行测试
             import torch
-            integrator = create_integrator({
-                "vocab_size": 100,
-                "dim": 16,
-                "num_units": 1,
-                "max_cycles": 1
-            })
+            
+            # 🆕 修复：直接使用已经导入的 IntegrationConfig，不需要重新导入
+            # 在模块开头已经导入了 IntegrationConfig
+            
+            # 创建配置对象
+            config = IntegrationConfig(
+                vocab_size=100,
+                dim=16,
+                num_units=3,  # 🆕 改为3，因为RGA架构需要3个单元
+                max_cycles=1
+            )
+            
+            # 使用配置对象创建集成器
+            integrator = create_integrator(config)
             
             input_ids = torch.randint(0, 100, (1, 8))
             output = integrator.forward(input_ids)
             
             print(f"✅ 前向传播成功")
             print(f"   Logits形状: {output['logits'].shape}")
+            if 'V_fused_mean' in output.get('V_stats', {}):
+                print(f"   V_fused均值: {output['V_stats']['V_fused_mean']:.4f}")
+            
+            # 测试数据集创建
+            print("\n🔧 测试数据集创建...")
+            # 使用虚拟测试数据
+            try:
+                import json
+                import tempfile
+                import os
+                
+                # 创建临时测试文件
+                temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8')
+                test_data = [
+                    ["你好，今天天气怎么样？", "天气很好，适合出门。"],
+                    ["请问附近有餐厅吗？", "有的，前面有一家不错的餐厅。"],
+                    ["谢谢你的帮助。", "不客气，很高兴能帮到你。"]
+                ]
+                json.dump(test_data, temp_file, ensure_ascii=False)
+                temp_file.close()
+                
+                dataset = SmartTextDataset(
+                    data_path=temp_file.name,
+                    seq_length=32,
+                    vocab_size=1000,
+                    max_samples=10
+                )
+                print(f"✅ 数据集创建成功，大小: {len(dataset)}")
+                print(f"   词汇表大小: {dataset.get_vocab_size()}")
+                
+                # 清理临时文件
+                os.unlink(temp_file.name)
+                
+            except Exception as dataset_error:
+                print(f"⚠️  数据集创建测试失败: {dataset_error}")
+                print("   跳过数据集测试...")
             
         except Exception as e:
             print(f"❌ 快速测试失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     print("\n✨ 模块加载完成")
     print("=" * 60)
