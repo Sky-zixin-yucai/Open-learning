@@ -550,7 +550,7 @@ class RGAIntegrator(nn.Module):
     
     def _forward_impl(self, input_ids: torch.Tensor, num_cycles: int, 
                      return_details: bool) -> Dict[str, Any]:
-        """前向传播实现"""
+        """前向传播实现 - 支持动态批次大小"""
         # 1. 嵌入层
         emb_result = self.embedding(input_ids, return_details=False)
         base_emb = emb_result['base_embeddings'].float()
@@ -561,22 +561,38 @@ class RGAIntegrator(nn.Module):
         for cycle in range(num_cycles):
             print(f"🔄 持续思考循环 {cycle+1}/{num_cycles}")
             
-            # 3. 初始化嵌入
+            # 3. 获取当前批次信息
+            current_batch_size = input_ids.shape[0] if len(input_ids.shape) > 0 else 1
+            current_seq_len = input_ids.shape[1] if len(input_ids.shape) > 1 else 1
+            
+            # 4. 初始化嵌入
             if cycle == 0:
                 current_emb = base_emb.clone()
             else:
                 prev_result = all_cycle_results[-1]
-                current_emb = self.cycle_projection(prev_result['Q_final'])
+                # 使用前一循环的Q_final，但保持正确形状
+                if prev_result['Q_final'].shape[:2] == (current_batch_size, current_seq_len):
+                    prev_q = prev_result['Q_final']
+                else:
+                    # 如果形状不匹配，进行适配
+                    prev_q = self._adapt_tensor_shape(
+                        prev_result['Q_final'], 
+                        (current_batch_size, current_seq_len)
+                    )
+                
+                current_emb = self.cycle_projection(prev_q)
             
-            # 4. 单向阀处理
+            # 5. 单向阀处理
             Q, K, V = self.one_way_valve(
                 current_emb.clone(),
                 current_emb.clone(),
                 current_emb.clone()
             )
+            
+            # 6. 处理引擎状态（独立于批次）
             self.engine.process_state(Q, K, V)
             
-            # 5. 链式反应单元处理
+            # 7. 链式反应单元处理
             V_list = []
             for unit_idx in range(self.config.num_units):
                 Q, K, V = self.chain_units[unit_idx](Q, K, V)
@@ -586,7 +602,7 @@ class RGAIntegrator(nn.Module):
                 V = self._adjust_v_by_qk_relation(Q, K, V, cycle, unit_idx + 1)
                 V_list.append(V)
             
-            # 6. 地质记忆存储与检索
+            # 8. 地质记忆存储与检索（独立于批次）
             Q_list, K_list, V_sublist_list = [Q]*3, [K]*3, [V_list]*3
             self.geological_memory.store(Q_list, K_list, V_sublist_list)
             
@@ -596,12 +612,13 @@ class RGAIntegrator(nn.Module):
                 depth=depth, time_layer=time_layer
             )
             
-            # 7. 融合计算
-            batch_size, seq_len, dim = Q.shape
-            Q_deep_expanded = Q_deep.unsqueeze(0).unsqueeze(0).expand(batch_size, seq_len, -1)
-            K_deep_expanded = K_deep.unsqueeze(0).unsqueeze(0).expand(batch_size, seq_len, -1)
-            V_deep_expanded = V_deep.unsqueeze(0).unsqueeze(0).expand(batch_size, seq_len, -1)
+            # 9. 地质记忆向量适配当前批次
+            # 地质记忆可能返回不同形状，需要适配当前批次
+            Q_deep = self._adapt_memory_tensor(Q_deep, Q.shape)
+            K_deep = self._adapt_memory_tensor(K_deep, K.shape)
+            V_deep = self._adapt_memory_tensor(V_deep, V.shape)
             
+            # 10. 融合计算
             # 动态权重调整
             if cycle == 0:
                 q_weights, k_weights, v_weights = [0.5, 0.3, 0.2], [0.5, 0.3, 0.2], [0.6, 0.3, 0.1]
@@ -619,25 +636,25 @@ class RGAIntegrator(nn.Module):
                 q_weights, k_weights = [0.5, 0.3, 0.2], [0.5, 0.3, 0.2]
             
             # 融合
-            Q_fused = (q_weights[0] * Q_deep_expanded + 
+            Q_fused = (q_weights[0] * Q_deep + 
                       q_weights[1] * Q + 
                       q_weights[2] * current_emb)
             
-            K_fused = (k_weights[0] * K_deep_expanded + 
+            K_fused = (k_weights[0] * K_deep + 
                       k_weights[1] * K + 
                       k_weights[2] * current_emb)
             
-            V_fused = (v_weights[0] * V_deep_expanded + 
+            V_fused = (v_weights[0] * V_deep + 
                       v_weights[1] * V + 
                       v_weights[2] * current_emb)
             
             V_fused = self._post_process_v(V_fused, Q_fused, K_fused, cycle)
             
-            # 8. 输出层
+            # 11. 输出层
             Q_normalized = self.layer_norm(Q_fused)
             logits = self.output_projection(Q_normalized)
             
-            # 9. 保存结果
+            # 12. 保存结果
             cycle_result = {
                 'cycle_num': cycle + 1,
                 'logits': logits,
@@ -664,7 +681,7 @@ class RGAIntegrator(nn.Module):
                 print("⚠️ V值健康度低，提前结束思考循环")
                 break
         
-        # 10. 准备最终输出
+        # 13. 准备最终输出
         final_result = all_cycle_results[-1]
         
         if len(all_cycle_results) > 1:
@@ -675,6 +692,11 @@ class RGAIntegrator(nn.Module):
             final_result['all_cycles'] = all_cycle_results
             final_result['engine_report'] = self.engine.get_analysis_report()
             final_result['config'] = self.config.to_dict()
+            final_result['batch_info'] = {
+                'batch_size': current_batch_size,
+                'seq_len': current_seq_len,
+                'shape_adaptations': self.shape_adaptations
+            }
         
         # 更新历史
         self.forward_history.append({
@@ -686,6 +708,166 @@ class RGAIntegrator(nn.Module):
         self.v_history.append(final_result['V_stats']['V_fused_mean'])
         
         return final_result
+    
+    # ==================== 新增的适配方法 ====================
+    
+    def _adapt_tensor_shape(self, tensor: torch.Tensor, target_shape: Tuple) -> torch.Tensor:
+        """
+        适配张量形状到目标形状
+        
+        参数:
+            tensor: 输入张量
+            target_shape: 目标形状 (batch_size, seq_len, ...)
+        
+        返回:
+            适配后的张量
+        """
+        # 如果形状已经匹配，直接返回
+        if tensor.shape[:2] == target_shape[:2]:
+            return tensor
+        
+        current_batch, current_seq = tensor.shape[0], tensor.shape[1]
+        target_batch, target_seq = target_shape[0], target_shape[1]
+        
+        # 记录适配情况
+        if not hasattr(self, 'shape_adaptations'):
+            self.shape_adaptations = []
+        
+        self.shape_adaptations.append({
+            'from': tuple(tensor.shape),
+            'to': target_shape,
+            'method': 'unknown'
+        })
+        
+        # 1. 适配批次大小
+        if current_batch != target_batch:
+            if target_batch > current_batch:
+                # 扩展批次
+                repeats = target_batch // current_batch + 1
+                tensor = tensor.repeat(repeats, 1, 1)[:target_batch]
+            else:
+                # 缩减批次
+                tensor = tensor[:target_batch]
+        
+        # 2. 适配序列长度
+        if len(tensor.shape) > 1 and current_seq != target_seq:
+            if target_seq > current_seq:
+                # 扩展序列
+                repeats = target_seq // current_seq + 1
+                tensor = tensor.repeat(1, repeats, 1)[:, :target_seq]
+            else:
+                # 缩减序列
+                tensor = tensor[:, :target_seq]
+        
+        return tensor
+    
+    def _adapt_memory_tensor(self, memory_tensor: torch.Tensor, target_shape: Tuple) -> torch.Tensor:
+        """
+        适配地质记忆张量到目标形状
+        
+        参数:
+            memory_tensor: 地质记忆检索的张量
+            target_shape: 目标形状
+            
+        返回:
+            适配后的张量
+        """
+        # 地质记忆可能返回不同维度的张量
+        # 我们需要适配到 (batch_size, seq_len, dim)
+        
+        # 如果已经是三维且批次大小匹配，直接返回
+        if len(memory_tensor.shape) == 3:
+            if memory_tensor.shape[0] == target_shape[0]:
+                return memory_tensor
+            else:
+                # 批次大小不匹配，使用第一个样本并扩展
+                if memory_tensor.shape[0] > 0:
+                    single_sample = memory_tensor[0:1]  # 取第一个样本
+                    return single_sample.expand(target_shape[0], -1, -1)
+        
+        # 如果是一维（特征向量），扩展到整个批次和序列
+        if len(memory_tensor.shape) == 1:
+            # memory_tensor 是 [dim]
+            dim = memory_tensor.shape[0]
+            # 扩展到 [batch_size, seq_len, dim]
+            batch_size, seq_len = target_shape[0], target_shape[1]
+            expanded = memory_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, dim]
+            expanded = expanded.expand(batch_size, seq_len, -1)
+            return expanded
+        
+        # 如果是二维 [seq_len, dim] 或 [batch_size, dim]
+        if len(memory_tensor.shape) == 2:
+            if memory_tensor.shape[0] == target_shape[1]:  # [seq_len, dim]
+                # 序列维度匹配，扩展批次
+                expanded = memory_tensor.unsqueeze(0)  # [1, seq_len, dim]
+                expanded = expanded.expand(target_shape[0], -1, -1)
+                return expanded
+            elif memory_tensor.shape[0] == target_shape[0]:  # [batch_size, dim]
+                # 批次匹配，扩展序列
+                expanded = memory_tensor.unsqueeze(1)  # [batch_size, 1, dim]
+                expanded = expanded.expand(-1, target_shape[1], -1)
+                return expanded
+        
+        # 默认：创建一个全零张量
+        return torch.zeros(target_shape, device=memory_tensor.device)
+    
+    def _calculate_adaptive_weights(self, current_cycle: int, total_cycles: int, 
+                                   batch_size: int) -> Tuple[List, List, List]:
+        """
+        计算自适应融合权重，考虑批次大小
+        
+        参数:
+            current_cycle: 当前循环索引
+            total_cycles: 总循环数
+            batch_size: 当前批次大小
+            
+        返回:
+            (q_weights, k_weights, v_weights)
+        """
+        base_q_weights = [0.5, 0.3, 0.2]
+        base_k_weights = [0.5, 0.3, 0.2]
+        base_v_weights = [0.6, 0.3, 0.1]
+        
+        # 根据批次大小调整权重
+        batch_factor = min(1.0, batch_size / 32.0)  # 以32为基准
+        
+        if batch_size < 4:
+            # 小批次：增加地质记忆权重
+            adjustment = 0.1 * batch_factor
+            q_weights = [base_q_weights[0] + adjustment, 
+                        base_q_weights[1] - adjustment/2, 
+                        base_q_weights[2] - adjustment/2]
+            
+            k_weights = [base_k_weights[0] + adjustment, 
+                        base_k_weights[1] - adjustment/2, 
+                        base_k_weights[2] - adjustment/2]
+            
+            v_weights = [base_v_weights[0] + adjustment, 
+                        base_v_weights[1] - adjustment/2, 
+                        base_v_weights[2] - adjustment/2]
+        elif batch_size > 64:
+            # 大批次：增加当前层权重
+            adjustment = 0.1 * batch_factor
+            q_weights = [base_q_weights[0] - adjustment, 
+                        base_q_weights[1] + adjustment, 
+                        base_q_weights[2]]
+            
+            k_weights = [base_k_weights[0] - adjustment, 
+                        base_k_weights[1] + adjustment, 
+                        base_k_weights[2]]
+            
+            v_weights = [base_v_weights[0] - adjustment, 
+                        base_v_weights[1] + adjustment, 
+                        base_v_weights[2]]
+        else:
+            # 中等批次：使用基础权重
+            q_weights, k_weights, v_weights = base_q_weights, base_k_weights, base_v_weights
+        
+        return q_weights, k_weights, v_weights
+    
+    def reset_shape_adaptations(self):
+        """重置形状适配记录"""
+        self.shape_adaptations = []
     
     # ==================== 分析方法 ====================
     # ==================== Analysis Methods ====================
