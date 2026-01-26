@@ -95,7 +95,7 @@ def test_detect_phase_transition():
     """
     print("\n测试相变检测... | Testing phase transition detection...")
     
-    calculator = CoreMetricsCalculator(phase_threshold=0.5)
+    calculator = CoreMetricsCalculator(phase_threshold=0.8)
     
     # 创建测试数据 | Create test data
     batch_size, seq_len, dim = 2, 10, 32

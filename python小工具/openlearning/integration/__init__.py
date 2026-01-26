@@ -9,7 +9,7 @@ RGA Rule-Governed Architecture integration module package, providing complete RG
 # ==================== 模块信息 ====================
 # ==================== Module Information ====================
 
-__version__ = "0.0.5"
+__version__ = "0.0.6"
 __author__ = "RGA Architecture Team"
 __description__ = "RGA规则治理架构集成模块"
 __license__ = "Apache 2.0"
@@ -23,26 +23,30 @@ _IMPORT_SUCCESSFUL = False
 try:
     # 直接导入当前目录下的yucai模块
     from .yucai import (
-        IntegrationConfig,
-        RGAIntegrator,
-        create_integrator,
-        save_disguised_model,
-        load_disguised_model,
-        test_integrator,
+        RGAIntegrator,           # RGA集成器主类
+        RGAConfig,              # RGA配置类（从core模块导入）
+        # 测试函数
+        run_comprehensive_tests,
+        quick_diagnostic_test,
+        benchmark_performance,
+        example_usage,
     )
     
     # 导入nn模块中的类
     from .nn import (
-        SmartTextDataset,
-        VisualTrainingProgress,
-        AdvancedConstrainedArchitectureTrainer,
+        SmartTextDataset,        # 智能文本数据集
+        VisualTrainingProgress,  # 可视化训练进度
+        AdvancedConstrainedArchitectureTrainer,  # 高级训练器
+        RGAConfigManager,        # RGA配置管理器
+        # 训练函数
         train_zixin_complete_model,
         quick_test_mode,
+        run_standard_training,
+        run_quick_training,
         resume_training,
+        # 测试函数
         test_model_inference,
-        run_architecture_test,
-        save_vocabulary_example,
-        main,
+        interactive_training,
     )
     
     _IMPORT_SUCCESSFUL = True
@@ -52,25 +56,26 @@ except ImportError as e:
     try:
         # 如果直接导入失败，尝试绝对导入
         from yucai import (
-            IntegrationConfig,
             RGAIntegrator,
-            create_integrator,
-            save_disguised_model,
-            load_disguised_model,
-            test_integrator,
+            RGAConfig,
+            run_comprehensive_tests,
+            quick_diagnostic_test,
+            benchmark_performance,
+            example_usage,
         )
         
         from nn import (
             SmartTextDataset,
             VisualTrainingProgress,
             AdvancedConstrainedArchitectureTrainer,
+            RGAConfigManager,
             train_zixin_complete_model,
             quick_test_mode,
+            run_standard_training,
+            run_quick_training,
             resume_training,
             test_model_inference,
-            run_architecture_test,
-            save_vocabulary_example,
-            main,
+            interactive_training,
         )
         
         _IMPORT_SUCCESSFUL = True
@@ -79,55 +84,60 @@ except ImportError as e:
     except ImportError as e2:
         print(f"❌ 集成模块导入失败: {e2}")
 
+# ==================== 创建集成器函数（用于测试兼容性）====================
+
+def create_integrator(config):
+    """
+    创建RGA集成器实例（兼容性函数）
+    
+    Args:
+        config: RGA配置对象
+        
+    Returns:
+        RGAIntegrator: RGA集成器实例
+    """
+    if _IMPORT_SUCCESSFUL:
+        return RGAIntegrator(config)
+    else:
+        raise ImportError("无法创建集成器，模块导入失败")
+
 # ==================== 导出列表 ====================
 # ==================== Export List ====================
 
 __all__ = [
-    # 配置类 | Configuration classes
-    "IntegrationConfig",
+    # 模块信息
+    '__version__',
+    '__author__',
+    '__description__',
+    '__license__',
     
-    # 核心类 | Core classes
-    "RGAIntegrator",
+    # 主类和配置
+    'RGAIntegrator',
+    'RGAConfig',
+    'create_integrator',
     
-    # 工厂函数 | Factory functions
-    "create_integrator",
-    "save_disguised_model",
-    "load_disguised_model",
+    # 数据相关
+    'SmartTextDataset',
     
-    # 便捷函数 | Convenience functions
-    "get_default_integration_config",
-    "validate_integration_config",
-    
-    # 测试函数 | Test functions
-    "test_integrator",
-    
-    # 数据集类
-    "SmartTextDataset",
-    
-    # 训练组件
-    "VisualTrainingProgress",
-    "AdvancedConstrainedArchitectureTrainer",
+    # 训练相关
+    'VisualTrainingProgress',
+    'AdvancedConstrainedArchitectureTrainer',
+    'RGAConfigManager',
     
     # 训练函数
-    "train_zixin_complete_model",
-    "quick_test_mode",
-    "resume_training",
+    'train_zixin_complete_model',
+    'quick_test_mode',
+    'run_standard_training',
+    'run_quick_training',
+    'resume_training',
     
-    # 推理函数
-    "test_model_inference",
-    
-    # 测试函数
-    "run_architecture_test",
-    "save_vocabulary_example",
-    
-    # 主程序入口
-    "main",
-    
-    # 模块信息 | Module information
-    "__version__",
-    "__author__",
-    "__description__",
-    "__license__",
+    # 推理和测试
+    'test_model_inference',
+    'interactive_training',
+    'run_comprehensive_tests',
+    'quick_diagnostic_test',
+    'benchmark_performance',
+    'example_usage',
 ]
 
 # ==================== 模块初始化 ====================
@@ -164,11 +174,8 @@ if __name__ == "__main__":
             # 创建一个最小配置的集成器进行测试
             import torch
             
-            # 🆕 修复：直接使用已经导入的 IntegrationConfig，不需要重新导入
-            # 在模块开头已经导入了 IntegrationConfig
-            
             # 创建配置对象
-            config = IntegrationConfig(
+            config = RGAConfig(
                 vocab_size=100,
                 dim=16,
                 num_units=3,  # 🆕 改为3，因为RGA架构需要3个单元

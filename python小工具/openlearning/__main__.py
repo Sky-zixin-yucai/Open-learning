@@ -13,7 +13,16 @@ import os
 import argparse
 import time
 import warnings
-from typing import Dict, List, Optional, Any
+import random
+import string
+from typing import Dict, List, Optional, Any, Tuple
+
+# ==================== 路径设置 ====================
+# 添加项目根目录到路径
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_parent_dir = os.path.dirname(_current_dir)
+if _parent_dir not in sys.path:
+    sys.path.insert(0, _parent_dir)
 
 # ==================== 颜色输出 ====================
 
@@ -60,64 +69,59 @@ def print_highlight(text: str):
 
 # ==================== 模块检查 ====================
 
-def check_modules():
+def check_modules() -> Tuple[bool, Dict[str, Any]]:
     """检查所有必需的模块"""
     print_header("模块检查")
     
     all_available = True
+    module_status = {}
     
     # 检查核心模块
     try:
-        # 导入核心模块的__init__.py来检查
-        from core import __init__ as core_module
-        print_step(f"core模块已加载")
+        import core
+        module_status['core'] = {
+            'loaded': True,
+            'version': getattr(core, '__version__', '未知'),
+            'exports': getattr(core, '__all__', [])[:5]  # 只显示前5个
+        }
+        print_step(f"✅ core模块已加载 (v{module_status['core']['version']})")
         
-        # 检查核心模块是否有必要的类
-        try:
-            from core import RGAConfig, RGAEngine, create_rga_engine
-            print_step(f"  - 核心类可用: RGAConfig, RGAEngine")
-        except ImportError:
-            print_warning(f"  - 部分核心类不可用")
-            
     except ImportError as e:
-        print_error(f"core模块导入失败: {e}")
+        print_error(f"❌ core模块导入失败: {e}")
+        module_status['core'] = {'loaded': False, 'error': str(e)}
         all_available = False
     
     # 检查层模块
     try:
-        # 导入层模块的__init__.py来检查
-        from layers import __init__ as layers_module
-        print_step(f"layers模块已加载")
+        import layers
+        module_status['layers'] = {
+            'loaded': True,
+            'version': getattr(layers, '__version__', '未知'),
+            'exports': getattr(layers, '__all__', [])[:5]
+        }
+        print_step(f"✅ layers模块已加载 (v{module_status['layers']['version']})")
         
-        # 检查层模块是否有必要的类
-        try:
-            from layers import create_layer, get_layer_factory
-            print_step(f"  - 工厂函数可用")
-        except ImportError:
-            print_warning(f"  - 部分层函数不可用")
-            
     except ImportError as e:
-        print_error(f"layers模块导入失败: {e}")
+        print_error(f"❌ layers模块导入失败: {e}")
+        module_status['layers'] = {'loaded': False, 'error': str(e)}
         all_available = False
     
     # 检查集成模块
     try:
-        # 导入集成模块的__init__.py来检查
-        from integration import __init__ as integration_module
-        print_step(f"integration模块已加载")
+        import integration
+        module_status['integration'] = {
+            'loaded': True,
+            'version': getattr(integration, '__version__', '未知'),
+            'exports': getattr(integration, '__all__', [])[:5]
+        }
+        print_step(f"✅ integration模块已加载 (v{module_status['integration']['version']})")
         
-        # 检查集成模块是否有必要的类
-        try:
-            from integration import create_integrator, RGAIntegrator
-            print_step(f"  - 集成器可用")
-        except ImportError:
-            print_warning(f"  - 部分集成器类不可用")
-            
     except ImportError as e:
-        print_error(f"integration模块导入失败: {e}")
+        print_error(f"❌ integration模块导入失败: {e}")
+        module_status['integration'] = {'loaded': False, 'error': str(e)}
         all_available = False
     
-    return all_available
+    return all_available, module_status
 
 # ==================== 演示部分 ====================
 
@@ -128,38 +132,40 @@ class RGADemoRunner:
         self.models_created = []
         self.data_generated = {}
         self.results = {}
+        self.module_available = {}
         
+    def _safe_import(self, module_name: str, class_name: str):
+        """安全导入类"""
+        try:
+            module = __import__(module_name)
+            for sub in module_name.split('.')[1:]:
+                module = getattr(module, sub)
+            return getattr(module, class_name)
+        except (ImportError, AttributeError) as e:
+            print_warning(f"导入 {module_name}.{class_name} 失败: {e}")
+            return None
+    
     def demo_1_basic_configuration(self):
         """演示1: 基础配置系统"""
         print_header("演示1: RGA基础配置系统")
         
         try:
-            # 使用相对导入而不是绝对导入
-            try:
-                from .core import RGAConfig, get_default_config, validate_config
-            except ImportError:
-                from core import RGAConfig, get_default_config, validate_config
+            # 尝试导入核心模块
+            RGAConfig = self._safe_import('core', 'RGAConfig')
+            get_default_config = self._safe_import('core', 'get_default_config')
+            validate_config = self._safe_import('core', 'validate_config')
+            
+            if not all([RGAConfig, get_default_config, validate_config]):
+                print_error("核心模块功能不全，跳过此演示")
+                return False
             
             # 1.1 创建默认配置
             print_info("1.1 创建默认配置")
             default_config = RGAConfig()
             print_step(f"默认配置创建成功:")
-            print(f"  特征维度: {default_config.dim}")
-            print(f"  词汇表大小: {default_config.vocab_size}")
-            print(f"  相变阈值: {default_config.phase_threshold}")
-            
-            # 检查是否有额外的配置属性
-            if hasattr(default_config, 'to_dict'):
-                config_dict = default_config.to_dict()
-                extra_info = False
-                
-                # 显示额外的配置信息（如果有的话）
-                for key, value in config_dict.items():
-                    if key not in ['dim', 'vocab_size', 'phase_threshold'] and value is not None:
-                        if not extra_info:
-                            print(f"  额外配置:")
-                            extra_info = True
-                        print(f"    {key}: {value}")
+            print(f"  特征维度: {getattr(default_config, 'dim', 'N/A')}")
+            print(f"  词汇表大小: {getattr(default_config, 'vocab_size', 'N/A')}")
+            print(f"  相变阈值: {getattr(default_config, 'phase_threshold', 'N/A')}")
             
             # 1.2 创建自定义配置
             print_info("\n1.2 创建自定义配置")
@@ -186,6 +192,8 @@ class RGADemoRunner:
             
         except Exception as e:
             print_error(f"配置演示失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def demo_2_layer_system(self):
@@ -193,11 +201,14 @@ class RGADemoRunner:
         print_header("演示2: RGA层系统")
         
         try:
-            # 使用相对导入
-            try:
-                from .layers import create_layer, get_layer_factory, list_available_layers
-            except ImportError:
-                from layers import create_layer, get_layer_factory, list_available_layers
+            # 尝试导入层模块
+            create_layer = self._safe_import('layers', 'create_layer')
+            get_layer_factory = self._safe_import('layers', 'get_layer_factory')
+            list_available_layers = self._safe_import('layers', 'list_available_layers')
+            
+            if not all([create_layer, get_layer_factory, list_available_layers]):
+                print_error("层模块功能不全，跳过此演示")
+                return False
             
             # 2.1 获取层工厂
             print_info("2.1 获取层工厂")
@@ -247,14 +258,16 @@ class RGADemoRunner:
                         print(f"  V门: {gate_values.get('gate_V', 0):.3f}")
                         if 'V_dominance' in gate_values:
                             print(f"  V主导性: {gate_values['V_dominance']}")
-                    except:
-                        pass
+                    except Exception as e:
+                        print_warning(f"  获取门控值失败: {e}")
             
             self.results['layers'] = created_layers
             return True
             
         except Exception as e:
             print_error(f"层系统演示失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def demo_3_engine_system(self):
@@ -262,11 +275,12 @@ class RGADemoRunner:
         print_header("演示3: RGA引擎系统")
         
         try:
-            # 使用相对导入
-            try:
-                from .core import create_rga_engine, calculate_state_change
-            except ImportError:
-                from core import create_rga_engine, calculate_state_change
+            # 尝试导入引擎模块
+            create_rga_engine = self._safe_import('core', 'create_rga_engine')
+            
+            if not create_rga_engine:
+                print_error("引擎模块功能不全，跳过此演示")
+                return False
             
             import torch
             
@@ -335,14 +349,19 @@ class RGADemoRunner:
             report = engine.get_analysis_report()
             
             print_step("分析报告摘要:")
-            print(f"  处理状态数: {report['engine_info']['total_states_processed']}")
-            print(f"  检测到相变: {report['performance_metrics']['transition_frequency']*100:.1f}%")
-            print(f"  当前学习阶段: {report['learning_analysis']['phase']}")
+            print(f"  处理状态数: {report.get('engine_info', {}).get('total_states_processed', 'N/A')}")
+            
+            transition_freq = report.get('performance_metrics', {}).get('transition_frequency', 0)
+            print(f"  检测到相变: {transition_freq*100:.1f}%")
+            
+            learning_phase = report.get('learning_analysis', {}).get('phase', '未知')
+            print(f"  当前学习阶段: {learning_phase}")
             
             # 3.5 显示优化建议
-            if 'recommendations' in report and report['recommendations']:
+            recommendations = report.get('recommendations', [])
+            if recommendations:
                 print_info("优化建议:")
-                for i, rec in enumerate(report['recommendations'][:3], 1):
+                for i, rec in enumerate(recommendations[:3], 1):
                     print(f"  {i}. {rec}")
             
             self.results['engine'] = engine
@@ -350,6 +369,8 @@ class RGADemoRunner:
             
         except Exception as e:
             print_error(f"引擎系统演示失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def demo_4_integrator_system(self):
@@ -357,41 +378,41 @@ class RGADemoRunner:
         print_header("演示4: RGA集成器系统")
         
         try:
-            # 使用相对导入
-            try:
-                from .integration import create_integrator, save_disguised_model, load_disguised_model
-            except ImportError:
-                from integration import create_integrator, save_disguised_model, load_disguised_model
+            # 尝试导入集成器模块
+            create_integrator = self._safe_import('integration', 'create_integrator')
+            RGAIntegrator = self._safe_import('integration', 'RGAIntegrator')
+            RGAConfig = self._safe_import('core', 'RGAConfig')
+            
+            if not create_integrator:
+                print_error("集成器模块功能不全，跳过此演示")
+                return False
             
             import torch
             
             # 4.1 创建集成器
             print_info("4.1 创建RGA集成器")
-            integrator_config = {
-                "vocab_size": 100,
-                "dim": 32,
-                "num_units": 1,
-                "max_cycles": 2,
-                "enable_disguise": True
-            }
+            integrator_config = RGAConfig(
+                vocab_size=100,
+                dim=32,
+                num_units=3,
+                max_cycles=3,
+            )
             
             integrator = create_integrator(integrator_config)
             print_step("RGA集成器创建成功")
             
-            # 通过config获取属性
-            if hasattr(integrator, 'config'):
-                print(f"  词汇表大小: {integrator.config.vocab_size}")
-                print(f"  特征维度: {integrator.config.dim}")
-                print(f"  单元数量: {integrator.config.num_units}")
-            else:
-                print(f"  配置: {integrator_config}")
+            # 显示配置信息
+            print(f"  词汇表大小: {integrator.config.vocab_size}")
+            print(f"  特征维度: {integrator.config.dim}")
+            print(f"  单元数量: {integrator.config.num_units}")
+            print(f"  最大循环数: {integrator.config.max_cycles}")
             
             # 4.2 创建测试输入
             print_info("\n4.2 创建测试输入")
             torch.manual_seed(123)
             batch_size = 1
             seq_len = 16
-            vocab_size = integrator_config['vocab_size']
+            vocab_size = integrator.config.vocab_size
             input_ids = torch.randint(0, vocab_size, (batch_size, seq_len))
             
             print_step(f"输入数据形状: {input_ids.shape}")
@@ -427,42 +448,40 @@ class RGADemoRunner:
                 else:
                     print_step(f"注意力权重类型: {type(attn_weights)}")
             
-            # 4.5 保存和加载模型（演示）
+            # 4.5 模型保存和加载演示
             print_info("\n4.5 模型保存和加载演示")
             try:
-                # 创建临时文件路径
                 import tempfile
-                import random
-                import string
                 
                 # 生成唯一的文件名
                 random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
                 model_path = os.path.join(tempfile.gettempdir(), f"rga_demo_model_{random_str}.pth")
                 
                 print_info(f"保存模型到临时文件: {model_path}")
-                save_disguised_model(integrator, model_path)
+                
+                # 保存模型状态
+                torch.save({
+                    'model_state_dict': integrator.state_dict(),
+                    'config': integrator.config.to_dict(),
+                }, model_path)
                 print_step("模型保存成功")
                 
                 print_info("加载模型")
-                loaded_model = load_disguised_model(model_path)
+                # 创建新模型并加载状态
+                loaded_integrator = create_integrator(integrator_config)
+                checkpoint = torch.load(model_path)
+                loaded_integrator.load_state_dict(checkpoint['model_state_dict'])
                 print_step("模型加载成功")
                 
                 # 验证加载的模型
                 print_info("验证加载的模型")
-                test_outputs = loaded_model.forward(input_ids)
+                test_outputs = loaded_integrator.forward(input_ids)
                 print_step("加载模型推理成功")
                 
-                # 清理临时文件 - 更稳健的删除方式
-                try:
-                    import shutil
-                    if os.path.exists(model_path):
-                        if os.path.isfile(model_path):
-                            os.unlink(model_path)
-                        else:
-                            shutil.rmtree(model_path)
-                        print_step("临时文件已清理")
-                except Exception as e:
-                    print_warning(f"临时文件清理失败: {e}")
+                # 清理临时文件
+                if os.path.exists(model_path):
+                    os.unlink(model_path)
+                    print_step("临时文件已清理")
                 
             except Exception as e:
                 print_warning(f"模型保存/加载演示跳过: {e}")
@@ -472,6 +491,8 @@ class RGADemoRunner:
             
         except Exception as e:
             print_error(f"集成器系统演示失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def demo_5_visualization(self):
@@ -487,10 +508,10 @@ class RGADemoRunner:
                 
                 # 修复中文字体问题
                 try:
-                    # 尝试设置中文字体
                     plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
                     plt.rcParams['axes.unicode_minus'] = False
-                except:
+                except Exception as e:
+                    print_warning(f"字体设置失败: {e}")
                     pass
                     
             except ImportError:
@@ -560,46 +581,52 @@ class RGADemoRunner:
                 chart_path = tmp.name
             
             plt.savefig(chart_path, dpi=150, bbox_inches='tight')
+            
+            # 显示图表
+            plt.show()
             plt.close()
             
-            print_step(f"Visualization chart generated: {chart_path}")
-            print_info("Chart shows:")
-            print("  1. State change trend and phase transition detection")
-            print("  2. Learning phase distribution")
+            print_step(f"可视化图表已生成: {chart_path}")
+            print_info("图表显示:")
+            print("  1. 状态变化趋势和相变检测")
+            print("  2. 学习阶段分布")
             
             # 清理临时文件
-            os.unlink(chart_path)
+            if os.path.exists(chart_path):
+                os.unlink(chart_path)
+                print_step("临时图表文件已清理")
             
             return True
             
         except Exception as e:
-            print_warning(f"Visualization demo encountered issues: {e}")
+            print_warning(f"可视化演示遇到问题: {e}")
             return True  # 可视化不是核心功能，允许失败
     
     def run_complete_demo(self):
         """运行完整的演示流程"""
         print_header("OpenLearning RGA Complete Demo", width=80)
-        print_highlight("Experience the complete RGA Rule-Governed Architecture!")
+        print_highlight("体验完整的RGA规则治理架构!")
         print()
         
         # 检查环境
-        print_info("Checking environment...")
-        modules_ok = check_modules()
+        print_info("检查环境...")
+        modules_ok, module_status = check_modules()
         
         if not modules_ok:
-            print_error("Environment check failed, cannot continue demo")
+            print_error("环境检查失败，无法继续演示")
+            print_info("请确保所有子模块都已正确安装")
             return False
         
-        print_step("Environment check passed, starting demo...")
+        print_step("环境检查通过，开始演示...")
         print()
         
         # 运行各个演示
         demos = [
-            ("Basic Configuration", self.demo_1_basic_configuration),
-            ("Layer System", self.demo_2_layer_system),
-            ("Engine System", self.demo_3_engine_system),
-            ("Integrator System", self.demo_4_integrator_system),
-            ("Visualization", self.demo_5_visualization),
+            ("基础配置", self.demo_1_basic_configuration),
+            ("层系统", self.demo_2_layer_system),
+            ("引擎系统", self.demo_3_engine_system),
+            ("集成器系统", self.demo_4_integrator_system),
+            ("可视化", self.demo_5_visualization),
         ]
         
         results = {}
@@ -608,44 +635,46 @@ class RGADemoRunner:
         
         for demo_name, demo_func in demos:
             try:
-                print_info(f"Starting: {demo_name}")
+                print_info(f"开始演示: {demo_name}")
                 success = demo_func()
                 results[demo_name] = success
                 
                 if success:
                     successful_demos += 1
-                    print_step(f"Demo completed: {demo_name}")
+                    print_step(f"演示完成: {demo_name}")
                 else:
-                    print_warning(f"Demo failed: {demo_name}")
+                    print_warning(f"演示失败: {demo_name}")
                 
                 print()  # 空行分隔
                 
             except Exception as e:
-                print_error(f"Demo exception: {demo_name} - {e}")
+                print_error(f"演示异常: {demo_name} - {e}")
+                import traceback
+                traceback.print_exc()
                 results[demo_name] = False
         
         # 演示总结
-        print_header("Demo Summary", width=80)
-        print_step(f"Completed demos: {successful_demos}/{total_demos}")
+        print_header("演示总结", width=80)
+        print_step(f"完成演示: {successful_demos}/{total_demos}")
         
         for demo_name, success in results.items():
-            status = "✅ Success" if success else "❌ Failed"
-            print(f"  {demo_name:20} {status}")
+            status = "✅ 成功" if success else "❌ 失败"
+            print(f"  {demo_name:15} {status}")
         
         print()
         
         if successful_demos == total_demos:
-            print_success("🎉 All demos completed successfully!")
+            print_success("🎉 所有演示均成功完成!")
             print()
-            print_highlight("You've experienced the complete RGA Rule-Governed Architecture:")
-            print("  1. Flexible RGA configuration system")
-            print("  2. Rich variety of specialized layers")
-            print("  3. Intelligent state monitoring and phase detection engine")
-            print("  4. Complete model integration and disguise capability")
-            print("  5. Intuitive visualization analysis")
+            print_highlight("您已体验了完整的RGA规则治理架构:")
+            print("  1. 灵活的RGA配置系统")
+            print("  2. 丰富的专用层类型")
+            print("  3. 智能状态监控和相变检测引擎")
+            print("  4. 完整的模型集成能力")
+            print("  5. 直观的可视化分析")
         else:
-            print_warning(f"Some demos failed ({total_demos - successful_demos}/{total_demos})")
-            print_info("Check module imports and dependencies")
+            print_warning(f"部分演示失败 ({total_demos - successful_demos}/{total_demos})")
+            print_info("请检查模块导入和依赖项")
         
         return successful_demos == total_demos
 
@@ -657,46 +686,57 @@ def main():
         description="OpenLearning RGA - Main Demo Entry",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  python -m openlearning           # Run complete demo
-  python -m openlearning --demo    # Run demo only
-  python -m openlearning --test    # Run tests only
+示例:
+  python -m openlearning           # 运行完整演示
+  python -m openlearning --demo    # 运行演示
+  python -m openlearning --test    # 运行测试
         """
     )
     
     parser.add_argument(
         "--demo", 
         action="store_true",
-        help="Run complete demo"
+        help="运行完整演示"
     )
     
     parser.add_argument(
         "--test",
         action="store_true",
-        help="Run tests"
+        help="运行测试"
     )
     
     parser.add_argument(
         "--fast",
         action="store_true",
-        help="Run fast demo (skip some steps)"
+        help="运行快速演示（跳过一些步骤）"
     )
     
     parser.add_argument(
         "--no-visualization",
         action="store_true",
-        help="Skip visualization demo"
+        help="跳过可视化演示"
+    )
+    
+    parser.add_argument(
+        "--check-modules",
+        action="store_true",
+        help="只检查模块状态"
     )
     
     args = parser.parse_args()
     
     # 显示欢迎信息
-    print_header("OpenLearning RGA Rule-Governed Architecture", width=80)
-    print_highlight("One-stop experience script - No installation required")
+    print_header("OpenLearning RGA 规则治理架构", width=80)
+    print_highlight("一站式体验脚本 - 无需额外安装")
     print()
-    print("Version: 0.0.3 | Author: RGA Architecture Team")
+    print("版本: 0.0.6 | 作者: RGA 架构团队")
     print("GitHub: https://github.com/Sky-zixin-yucai/Open-learning")
     print("="*80)
+    
+    # 如果只检查模块
+    if args.check_modules:
+        modules_ok, module_status = check_modules()
+        return 0 if modules_ok else 1
     
     # 创建演示运行器
     runner = RGADemoRunner()
@@ -712,39 +752,43 @@ Examples:
             success = runner.run_complete_demo() and success
         
         if args.test:
-            print_header("Running Tests")
+            print_header("运行测试")
             # 运行集成模块的测试
             try:
-                from integration import test_integrator
-                test_integrator()
-                print_step("Tests completed")
+                import integration
+                if hasattr(integration, 'test_integrator'):
+                    integration.test_integrator()
+                    print_step("测试完成")
+                else:
+                    print_warning("测试函数不可用")
+                    success = False
             except ImportError:
-                print_error("Test function not available")
+                print_error("无法导入integration模块")
                 success = False
             except Exception as e:
-                print_error(f"Test failed: {e}")
+                print_error(f"测试失败: {e}")
                 success = False
         
         if success:
             print()
-            print_header("Next Steps", width=80)
-            print("1. View project documentation for detailed design")
-            print("2. Run unit tests: python -m pytest tests/")
-            print("3. Try modifying configuration parameters to create custom models")
-            print("4. Import and use RGA components in your own projects")
-            print("5. Contribute to the project: https://github.com/Sky-zixin-yucai/Open-learning")
+            print_header("下一步", width=80)
+            print("1. 查看项目文档以了解详细设计")
+            print("2. 运行单元测试: python -m pytest tests/")
+            print("3. 尝试修改配置参数以创建自定义模型")
+            print("4. 在您自己的项目中导入和使用RGA组件")
+            print("5. 为项目贡献: https://github.com/Sky-zixin-yucai/Open-learning")
             print()
-            print_success("Thank you for using OpenLearning RGA! 🚀")
+            print_success("感谢使用 OpenLearning RGA! 🚀")
             return 0
         else:
-            print_error("Issues encountered during demo, check error messages")
+            print_error("演示过程中遇到问题，请检查错误信息")
             return 1
             
     except KeyboardInterrupt:
-        print("\n\n⏹️  Demo interrupted by user")
+        print("\n\n⏹️  演示被用户中断")
         return 0
     except Exception as e:
-        print_error(f"Demo run failed: {e}")
+        print_error(f"演示运行失败: {e}")
         import traceback
         traceback.print_exc()
         return 1

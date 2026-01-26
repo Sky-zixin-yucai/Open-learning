@@ -60,7 +60,7 @@ class RGAConfig:
     max_cycles: int = 3          # 最大持续思考循环数 | Maximum continuous thinking cycles
     
     # ==================== 公式参数 | Formula Parameters ====================
-    phase_threshold: float = 0.43    # 相变检测阈值 | Phase transition detection threshold
+    phase_threshold: float = 0.83    # 相变检测阈值 | Phase transition detection threshold
     v_scaling_factor: float = 1.0    # V值缩放因子 | V-value scaling factor
     min_Q_concepts: float = 0.01     # 最小Q概念密度 | Minimum Q concept density
     history_length: int = 10         # 历史记录长度 | History record length
