@@ -1,95 +1,30 @@
-# ==================== 修复导入路径 ====================
 import os
 import sys
 
+# 获取当前文件目录
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-def is_project_root(path):
-    """检查给定路径是否是项目根目录"""
-    core_exists = os.path.exists(os.path.join(path, "core", "__init__.py"))
-    layers_exists = os.path.exists(os.path.join(path, "layers", "__init__.py"))
-    return core_exists and layers_exists
+# 计算项目根目录（openlearning 的父目录）
+project_root = os.path.dirname(os.path.dirname(current_dir))
 
-def setup_project_path():
-    """设置项目路径并尝试导入"""
-    project_root = None
-    
-    # 1. 向上查找项目根目录（最多向上5层）
-    path = current_dir
-    for _ in range(5):  # 限制向上查找的深度
-        if is_project_root(path):
-            project_root = path
-            print(f"✅ 在 {path} 找到项目根目录")
-            break
-        parent = os.path.dirname(path)
-        if parent == path:  # 到达根目录
-            break
-        path = parent
-    
-    # 2. 如果没找到，尝试常见路径
-    if project_root is None:
-        possible_paths = [
-            os.path.dirname(current_dir),  # 父目录
-            os.path.dirname(os.path.dirname(current_dir)),  # 祖父目录
-            current_dir,  # 当前目录
-            os.path.join(current_dir, ".."),  # 上一级
-        ]
-        
-        for path in possible_paths:
-            path = os.path.normpath(path)  # 规范化路径
-            if is_project_root(path):
-                project_root = path
-                print(f"✅ 在 {path} 找到项目根目录")
-                break
-    
-    if project_root is None:
-        print("❌ 无法找到包含 core 和 layers 的目录")
-        print("当前目录结构:")
-        for root, dirs, files in os.walk(current_dir, topdown=True):
-            level = root.replace(current_dir, '').count(os.sep)
-            indent = ' ' * 2 * level
-            print(f"{indent}{os.path.basename(root)}/")
-            subindent = ' ' * 2 * (level + 1)
-            for d in dirs[:5]:  # 只显示前5个子目录
-                print(f"{subindent}{d}/")
-            if len(dirs) > 5:
-                print(f"{subindent}... ({len(dirs) - 5} 个目录)")
-            break  # 只显示第一层
-        sys.exit(1)
-    
-    # 将项目根目录添加到 sys.path
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-        print(f"✅ 已将项目根目录添加到 Python 路径: {project_root}")
-    
-    return project_root
+# 将项目根目录添加到 sys.path
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-# 尝试导入模块
 try:
-    from yucai import RGAConfig, RGAIntegrator
-    print("✅ 从 yucai.py 导入成功")
-    
+    # 使用完整路径导入
+    from openlearning.integration.yucai import RGAConfig, RGAIntegrator
+    print("✅ 导入成功")
 except ImportError as e:
-    print(f"⚠️  首次导入失败: {e}")
-    print("正在设置项目路径...")
-    
-    # 设置项目路径
-    project_root = setup_project_path()
-    
-    # 重新尝试导入
-    try:
-        from yucai import RGAConfig, RGAIntegrator
-        print("✅ 重新导入成功")
-    except ImportError as e2:
-        print(f"❌ 重新导入失败: {e2}")
-        print(f"当前 Python 路径:")
-        for i, path in enumerate(sys.path):
-            print(f"  {i}: {path}")
-        sys.exit(1)
+    print(f"❌ 导入失败: {e}")
+    print(f"项目根目录: {project_root}")
+    print(f"当前目录: {current_dir}")
+    sys.exit(1)
 
-# 验证导入的模块
-print(f"✅ RGAConfig: {RGAConfig}")
-print(f"✅ RGAIntegrator: {RGAIntegrator}")
+# 现在可以正常使用 RGAConfig 和 RGAIntegrator
+# 例如:
+# config = RGAConfig()
+# integrator = RGAIntegrator(config)
 
 # =================== 导入所需模块 ====================
 import sys

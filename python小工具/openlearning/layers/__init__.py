@@ -27,7 +27,7 @@ Mathematical Foundation:
 • 固定归一化: RMSNorm变体，无学习参数 | Fixed normalization: RMSNorm variants without learnable parameters
 """
 
-__version__ = "0.0.7"
+__version__ = "0.0.8"
 __author__ = "RGA Architecture Team"
 
 import sys
@@ -961,7 +961,7 @@ __all__ = [
 def _init_module():
     """初始化模块 | Initialize module"""
     print(f"✅ RGA层模块已加载 | RGA layers module loaded")
-    print(f"   版本: 0.0.7 | Version: 0.0.7")
+    print(f"   版本: 0.0.8 | Version: 0.0.8")
     print(f"   包含 {len(__all__)} 个导出项 | Contains {len(__all__)} exports")
     print(f"   注册表: {len(_layer_registry.list_classes())} 个类, {len(_layer_registry.list_factories())} 个工厂")
     print(f"   工厂: 已缓存 {len(_layer_factory._created_layers)} 个层")

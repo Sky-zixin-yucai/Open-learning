@@ -347,7 +347,7 @@ openlearning integration               # 步骤5：集成模块 | Step 5: Integr
 
 ---
 
-**版本**: 0.0.7  
+**版本**: 0.0.8  
 **作者**: RGA Architecture Team  
 **许可**: Apache 2.0  
 **GitHub**: https://github.com/Sky-zixin-yucai/Open-learning
