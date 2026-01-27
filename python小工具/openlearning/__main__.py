@@ -15,18 +15,19 @@ import time
 import warnings
 import random
 import string
+import tempfile
 from typing import Dict, List, Optional, Any, Tuple
 
 # ==================== 路径设置 ====================
-# 添加项目根目录到路径
 _current_dir = os.path.dirname(os.path.abspath(__file__))
 _parent_dir = os.path.dirname(_current_dir)
+
 if _parent_dir not in sys.path:
     sys.path.insert(0, _parent_dir)
 
 # ==================== 颜色输出 ====================
-
 class Colors:
+    """颜色代码定义"""
     HEADER = '\033[95m'
     BLUE = '\033[94m'
     CYAN = '\033[96m'
@@ -37,38 +38,45 @@ class Colors:
     UNDERLINE = '\033[4m'
     END = '\033[0m'
 
-def print_header(text: str, width: int = 60):
+
+def print_header(text: str, width: int = 60) -> None:
     """打印标题"""
     print(f"\n{Colors.BOLD}{Colors.CYAN}{'='*width}{Colors.END}")
     print(f"{Colors.BOLD}{Colors.CYAN}{text:^{width}}{Colors.END}")
     print(f"{Colors.BOLD}{Colors.CYAN}{'='*width}{Colors.END}")
 
-def print_step(text: str, symbol: str = "✅"):
+
+def print_step(text: str, symbol: str = "✅") -> None:
     """打印步骤"""
     print(f"{Colors.GREEN}{symbol} {text}{Colors.END}")
 
-def print_info(text: str):
+
+def print_info(text: str) -> None:
     """打印信息"""
     print(f"{Colors.BLUE}ℹ️  {text}{Colors.END}")
 
-def print_warning(text: str):
+
+def print_warning(text: str) -> None:
     """打印警告"""
     print(f"{Colors.YELLOW}⚠️  {text}{Colors.END}")
 
-def print_error(text: str):
+
+def print_error(text: str) -> None:
     """打印错误"""
     print(f"{Colors.RED}❌ {text}{Colors.END}")
 
-def print_success(text: str):
+
+def print_success(text: str) -> None:
     """打印成功"""
     print(f"{Colors.GREEN}{Colors.BOLD}✨ {text}{Colors.END}")
 
-def print_highlight(text: str):
+
+def print_highlight(text: str) -> None:
     """高亮显示"""
     print(f"{Colors.CYAN}{Colors.BOLD}{text}{Colors.END}")
 
-# ==================== 模块检查 ====================
 
+# ==================== 模块检查 ====================
 def check_modules() -> Tuple[bool, Dict[str, Any]]:
     """检查所有必需的模块"""
     print_header("模块检查")
@@ -123,8 +131,8 @@ def check_modules() -> Tuple[bool, Dict[str, Any]]:
     
     return all_available, module_status
 
-# ==================== 演示部分 ====================
 
+# ==================== 演示部分 ====================
 class RGADemoRunner:
     """RGA演示运行器"""
     
@@ -133,8 +141,8 @@ class RGADemoRunner:
         self.data_generated = {}
         self.results = {}
         self.module_available = {}
-        
-    def _safe_import(self, module_name: str, class_name: str):
+    
+    def _safe_import(self, module_name: str, class_name: str) -> Optional[Any]:
         """安全导入类"""
         try:
             module = __import__(module_name)
@@ -145,7 +153,7 @@ class RGADemoRunner:
             print_warning(f"导入 {module_name}.{class_name} 失败: {e}")
             return None
     
-    def demo_1_basic_configuration(self):
+    def demo_1_basic_configuration(self) -> bool:
         """演示1: 基础配置系统"""
         print_header("演示1: RGA基础配置系统")
         
@@ -162,7 +170,7 @@ class RGADemoRunner:
             # 1.1 创建默认配置
             print_info("1.1 创建默认配置")
             default_config = RGAConfig()
-            print_step(f"默认配置创建成功:")
+            print_step("默认配置创建成功:")
             print(f"  特征维度: {getattr(default_config, 'dim', 'N/A')}")
             print(f"  词汇表大小: {getattr(default_config, 'vocab_size', 'N/A')}")
             print(f"  相变阈值: {getattr(default_config, 'phase_threshold', 'N/A')}")
@@ -174,7 +182,7 @@ class RGADemoRunner:
                 vocab_size=1000,
                 phase_threshold=0.8,
             )
-            print_step(f"自定义配置创建成功:")
+            print_step("自定义配置创建成功:")
             print(f"  特征维度: {custom_config.dim}")
             print(f"  词汇表大小: {custom_config.vocab_size}")
             print(f"  相变阈值: {custom_config.phase_threshold}")
@@ -196,7 +204,7 @@ class RGADemoRunner:
             traceback.print_exc()
             return False
     
-    def demo_2_layer_system(self):
+    def demo_2_layer_system(self) -> bool:
         """演示2: 层系统"""
         print_header("演示2: RGA层系统")
         
@@ -218,6 +226,7 @@ class RGADemoRunner:
             # 2.2 查看可用层
             print_info("\n2.2 可用层类型")
             layer_types = ['attention', 'balancer', 'normalization', 'valve']
+            
             for layer_type in layer_types:
                 available = list_available_layers(layer_type)
                 if available:
@@ -270,7 +279,7 @@ class RGADemoRunner:
             traceback.print_exc()
             return False
     
-    def demo_3_engine_system(self):
+    def demo_3_engine_system(self) -> bool:
         """演示3: RGA引擎系统"""
         print_header("演示3: RGA引擎系统")
         
@@ -308,7 +317,7 @@ class RGADemoRunner:
             K = torch.randn(batch_size, seq_len, dim)
             V = torch.randn(batch_size, seq_len, dim)
             
-            print_step(f"测试数据形状:")
+            print_step("测试数据形状:")
             print(f"  Q: {Q.shape}")
             print(f"  K: {K.shape}")
             print(f"  V: {V.shape}")
@@ -373,7 +382,7 @@ class RGADemoRunner:
             traceback.print_exc()
             return False
     
-    def demo_4_integrator_system(self):
+    def demo_4_integrator_system(self) -> bool:
         """演示4: RGA集成器系统"""
         print_header("演示4: RGA集成器系统")
         
@@ -451,8 +460,6 @@ class RGADemoRunner:
             # 4.5 模型保存和加载演示
             print_info("\n4.5 模型保存和加载演示")
             try:
-                import tempfile
-                
                 # 生成唯一的文件名
                 random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
                 model_path = os.path.join(tempfile.gettempdir(), f"rga_demo_model_{random_str}.pth")
@@ -495,7 +502,7 @@ class RGADemoRunner:
             traceback.print_exc()
             return False
     
-    def demo_5_visualization(self):
+    def demo_5_visualization(self) -> bool:
         """演示5: 可视化功能"""
         print_header("演示5: RGA可视化功能")
         
@@ -510,9 +517,8 @@ class RGADemoRunner:
                 try:
                     plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
                     plt.rcParams['axes.unicode_minus'] = False
-                except Exception as e:
-                    print_warning(f"字体设置失败: {e}")
-                    pass
+                except Exception:
+                    pass  # 忽略字体设置失败
                     
             except ImportError:
                 print_warning("Matplotlib未安装，跳过可视化演示")
@@ -576,7 +582,6 @@ class RGADemoRunner:
             plt.tight_layout()
             
             # 保存图表
-            import tempfile
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
                 chart_path = tmp.name
             
@@ -602,7 +607,7 @@ class RGADemoRunner:
             print_warning(f"可视化演示遇到问题: {e}")
             return True  # 可视化不是核心功能，允许失败
     
-    def run_complete_demo(self):
+    def run_complete_demo(self) -> bool:
         """运行完整的演示流程"""
         print_header("OpenLearning RGA Complete Demo", width=80)
         print_highlight("体验完整的RGA规则治理架构!")
@@ -678,9 +683,9 @@ class RGADemoRunner:
         
         return successful_demos == total_demos
 
-# ==================== 主程序 ====================
 
-def main():
+# ==================== 主程序 ====================
+def main() -> int:
     """主函数"""
     parser = argparse.ArgumentParser(
         description="OpenLearning RGA - Main Demo Entry",
@@ -793,7 +798,7 @@ def main():
         traceback.print_exc()
         return 1
 
-# ==================== 入口点 ====================
 
+# ==================== 入口点 ====================
 if __name__ == "__main__":
     sys.exit(main())

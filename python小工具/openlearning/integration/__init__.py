@@ -9,7 +9,7 @@ RGA Rule-Governed Architecture integration module package, providing complete RG
 # ==================== 模块信息 ====================
 # ==================== Module Information ====================
 
-__version__ = "0.0.6"
+__version__ = "0.0.7"
 __author__ = "RGA Architecture Team"
 __description__ = "RGA规则治理架构集成模块"
 __license__ = "Apache 2.0"
