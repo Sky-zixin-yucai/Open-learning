@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openlearning"
-version = "0.0.8"
+version = "0.0.9"
 description = "A dependency installation tool for the Open-learning project"
 readme = "README.md"
 authors = [

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 core包功能测试 | core Package Functionality Test
 ============================================

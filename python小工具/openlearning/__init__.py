@@ -807,7 +807,7 @@ def check_imports():
 
 # ==================== 模块初始化 ====================
 
-__version__ = "0.0.8"
+__version__ = "0.0.9"
 __author__ = "RGA Architecture Team"
 __description__ = "智能导入系统 OpenLearning RGA"
 __license__ = "Apache 2.0"

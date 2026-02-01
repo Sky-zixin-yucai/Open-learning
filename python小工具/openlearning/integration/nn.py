@@ -1,31 +1,72 @@
-import os
 import sys
+import os
 
-# 获取当前文件目录
+# ==================== 修复导入路径 ====================
+# 获取当前文件所在目录
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# 计算项目根目录（openlearning 的父目录）
-project_root = os.path.dirname(os.path.dirname(current_dir))
-
-# 将项目根目录添加到 sys.path
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
+# 尝试导入路径设置
 try:
-    # 使用完整路径导入
-    from openlearning.integration.yucai import RGAConfig, RGAIntegrator
-    print("✅ 导入成功")
+    # 尝试从 yucai.py 导入路径设置
+    from yucai import (
+        RGAConfig, 
+        RGAIntegrator,
+    
+    )
+    print("✅ 从 yucai.py 导入成功")
+    
 except ImportError as e:
-    print(f"❌ 导入失败: {e}")
+    # 如果失败，尝试手动设置路径
+    print(f"尝试从 yucai.py 导入失败: {e}")
+    print("尝试手动设置路径...")
+    
+    # 寻找项目根目录
+    def find_project_root(start_path):
+        """查找包含 core 和 layers 目录的项目根目录"""
+        path = start_path
+        while path != os.path.dirname(path):
+            core_exists = os.path.exists(os.path.join(path, "core", "__init__.py"))
+            layers_exists = os.path.exists(os.path.join(path, "layers", "__init__.py"))
+            
+            if core_exists and layers_exists:
+                print(f"✅ 在 {path} 找到 core 和 layers 目录")
+                return path
+            
+            path = os.path.dirname(path)
+        
+        return None
+    
+    # 查找项目根目录
+    project_root = find_project_root(current_dir)
+    
+    if project_root is None:
+        # 尝试常见路径
+        possible_paths = [
+            os.path.dirname(current_dir),
+            os.path.dirname(os.path.dirname(current_dir)),
+            r"D:\桌面\学习\python小工具\openlearning",
+            current_dir,
+        ]
+        
+        for path in possible_paths:
+            core_exists = os.path.exists(os.path.join(path, "core", "__init__.py"))
+            layers_exists = os.path.exists(os.path.join(path, "layers", "__init__.py"))
+            
+            if core_exists and layers_exists:
+                project_root = path
+                print(f"✅ 在 {path} 找到 core 和 layers 目录")
+                break
+    
+    if project_root is None:
+        print("❌ 无法找到包含 core 和 layers 的目录")
+        sys.exit(1)
+    
+    # 将项目根目录添加到 sys.path
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    
     print(f"项目根目录: {project_root}")
-    print(f"当前目录: {current_dir}")
-    sys.exit(1)
-
-# 现在可以正常使用 RGAConfig 和 RGAIntegrator
-# 例如:
-# config = RGAConfig()
-# integrator = RGAIntegrator(config)
-
+        
 # =================== 导入所需模块 ====================
 import sys
 from torch.utils.data import DataLoader, random_split
