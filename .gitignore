@@ -25,7 +25,10 @@ share/python-wheels/
 venv/
 env/
 ENV/
+<<<<<<< HEAD
 myenv/
+=======
+>>>>>>> origin/main
 env.bak/
 venv.bak/
 pythonenv*
@@ -87,8 +90,11 @@ _build/
 *.db
 *.sqlite3
 
+<<<<<<< HEAD
 # ==================== 模型文件 ====================
 
+=======
+>>>>>>> origin/main
 # ==================== 但保留重要的配置文件 ====================
 # !configs/model/*.yaml
 # !configs/training/*.yaml

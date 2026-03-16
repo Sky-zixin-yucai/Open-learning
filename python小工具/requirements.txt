@@ -1,0 +1,82 @@
+# ================================================================
+# 幻觉下的规则治理架构 | Rule-Governance Architecture Under Illusion
+# 项目依赖说明文件 | Dependency Specifications (Objective Description)
+# ================================================================
+# 说明：此文件是对 `requirements.txt` 的客观技术说明，并非用于安装。
+# Note: This file provides objective technical descriptions of `requirements.txt`, NOT for installation.
+# 安装请使用原文件: `pip install -r requirements.txt`
+# To install, use the original: `pip install -r requirements.txt`
+# ================================================================
+
+# [核心人工智能框架 | Core AI Framework]
+torch==2.8.0+cu128                    # PyTorch 主库，提供张量计算与深度学习基础 | PyTorch main library for tensor computation and deep learning foundations.
+torchvision==0.23.0+cu128             # PyTorch 的计算机视觉扩展库，提供数据集、模型和变换 | PyTorch extension for computer vision (datasets, models, transforms).
+torchaudio==2.8.0+cu128               # PyTorch 的音频处理扩展库，提供音频 I/O 和转换功能 | PyTorch extension for audio processing (I/O, transformations).
+
+# [模型与工具链 | Models & Toolchain]
+transformers==4.57.0                  # Hugging Face 开发的 Transformer 架构模型库 | Library of Transformer architecture models by Hugging Face.
+accelerate==1.10.1                    # 用于简化 PyTorch 分布式训练和混合精度训练 | Simplifies distributed and mixed-precision training for PyTorch.
+modelscope==1.30.0                    # ModelScope 平台提供的模型库与开发工具套件 | Model library and development toolkit from the ModelScope platform.
+tokenizers==0.22.1                    # 为自然语言处理（NLP）模型提供快速分词功能 | Provides fast tokenization for Natural Language Processing (NLP) models.
+safetensors==0.6.2                    # 一种用于安全存储和加载张量的简单文件格式 | A simple, safe file format for storing and loading tensors.
+tiktoken==0.12.0                      # OpenAI 开发的，用于其 GPT 系列模型的分词器 | Tokenizer developed by OpenAI for its GPT model series.
+sentencepiece==0.2.1                  # 一种无监督的文本分词和子词单元化工具 | Unsupervised text tokenizer and subword unitizer.
+einops==0.8.1                         # 用于以可读、统一的方式操作张量维度的库 | A library for manipulating tensor dimensions in a readable and consistent way.
+transformers-stream-generator==0.0.5  # 为 Hugging Face Transformers 提供流式文本生成支持 | Enables streaming text generation for Hugging Face Transformers.
+
+# [数据处理与科学计算 | Data Processing & Scientific Computing]
+numpy==2.3.3                          # 用于处理大型多维数组和矩阵的基础科学计算包 | Fundamental package for scientific computing with large, multi-dimensional arrays.
+pandas==2.3.3                         # 提供高性能、易于使用的数据结构和数据分析工具 | Provides high-performance, easy-to-use data structures and data analysis tools.
+scipy==1.16.2                         # 基于 NumPy 的数学、科学和工程计算算法库 | Algorithms for mathematics, science, and engineering, built on NumPy.
+scikit-learn==1.7.2                   # 基于 NumPy/SciPy 的经典机器学习算法库 | Library for classical machine learning algorithms, built on NumPy/SciPy.
+joblib==1.5.2                         # 用于在 Python 中提供轻量级流水线和并行计算 | Provides lightweight pipelining and parallel computing in Python.
+psutil==7.1.0                         # 用于检索系统信息和进程管理的跨平台库 | Cross-platform library for retrieving system information and process management.
+narwhals==2.11.0                      # 一个兼容多种 DataFrame 库（如 Pandas, Polars）的查询框架 | A query framework compatible with multiple DataFrame libraries (e.g., Pandas, Polars).
+python-dateutil==2.9.0.post0          # 对 Python 标准 `datetime` 模块的强大扩展 | Powerful extensions to the Python standard `datetime` module.
+pytz==2025.2                          # 用于精确和跨平台的时区计算 | Library for accurate and cross-platform timezone calculations.
+tzdata==2025.2                        # 提供时区数据供 Python 标准库 `zoneinfo` 使用 | Provides timezone data for the Python standard library's `zoneinfo`.
+
+# [可视化 | Visualization]
+matplotlib==3.10.7                    # 一个全面的 Python 2D/3D 绘图库 | A comprehensive 2D/3D plotting library for Python.
+seaborn==0.13.2                       # 基于 Matplotlib 的统计数据可视化库 | Statistical data visualization library based on Matplotlib.
+plotly==6.4.0                         # 一个用于创建交互式图表和仪表盘的库 | A library for creating interactive plots and dashboards.
+pillow==11.3.0                        # Python 图像处理库（PIL Fork） | Python Imaging Library (PIL Fork) for image processing.
+contourpy==1.3.3                      # Matplotlib 的等高线绘图功能的后端库 | Backend library for Matplotlib's contour plotting functionality.
+cycler==0.12.1                        # 用于控制 Matplotlib 图表中颜色循环样式的工具 | Composable style cycles for controlling color/style cycles in Matplotlib.
+fonttools==4.60.1                     # 用于操作字体文件的库（例如，子集化、转换） | Library for manipulating font files (e.g., subsetting, conversion).
+kiwisolver==1.4.9                     # 一个用于 GUI 布局的快速实现的自约束求解器 | A fast implementation of a constraint satisfaction problem (CSP) solver for GUI layout.
+
+# [Web服务与API | Web Service & API]
+Flask==2.3.3                          # 一个用 Python 编写的轻量级 WSGI Web 应用程序框架 | A lightweight WSGI web application framework written in Python.
+Jinja2==3.1.6                         # 一个功能齐全的、快速的、安全的模板引擎 | A full-featured, fast, and secure template engine.
+Werkzeug==3.1.3                       # 一个用于 Python 的全面 WSGI Web 应用程序库 | A comprehensive WSGI web application library for Python.
+Flask-Cors==4.0.0                     # 用于处理 Flask 应用程序跨域资源共享（CORS）的扩展 | A Flask extension for handling Cross-Origin Resource Sharing (CORS).
+blinker==1.9.0                        # 为 Python 对象提供快速、简单的信号/事件分发 | Provides fast, simple object-to-object and broadcast signaling for Python.
+click==8.3.0                          # 用于以可组合方式创建漂亮命令行界面的包 | A package for creating beautiful command line interfaces in a composable way.
+itsdangerous==2.2.0                   # 用于在不受信环境中传递可信数据的助手 | Various helpers to pass trusted data to untrusted environments.
+MarkupSafe==3.0.2                     # 为 XML/HTML/XHTML 标记语言实现安全字符串 | Implements a safe string for XML/HTML/XHTML markup.
+
+# [网络与工具 | Network & Utilities]
+requests==2.32.5                      # 一个优雅而简单的 HTTP 库 | An elegant and simple HTTP library.
+urllib3==2.5.0                        # 一个功能强大、用户友好的 HTTP 客户端 | A powerful, user-friendly HTTP client.
+certifi==2025.8.3                     # 一个用于访问 Mozilla CA 证书包的 Python 包 | A Python package for providing Mozilla's CA Bundle.
+idna==3.10                            # 一个支持国际化域名（IDNA）的库 | A library to support the Internationalized Domain Names in Applications (IDNA) protocol.
+charset-normalizer==3.4.3             # 一个用于从 HTTP 流中检测字符集的库 | A library that helps you read text from an unknown charset encoding.
+protobuf==6.32.1                      # Google 的 Protocol Buffers - 一种数据交换格式 | Google's Protocol Buffers - a data interchange format.
+PyYAML==6.0.3                         # 一个 YAML 解析器和发射器 | A YAML parser and emitter.
+regex==2025.9.18                      # 一个提供正则表达式匹配操作的库，支持 Unicode | A library providing regular expression matching operations with full Unicode support.
+threadpoolctl==3.6.0                  # 一个用于限制原生库（如 BLAS）所用线程池的库 | Library to limit the number of threads used in native libraries (e.g., BLAS).
+colorama==0.4.6                       # 一个用于在 Windows 上输出彩色终端文本的简单库 | A simple cross-platform colored terminal text output library for Windows.
+packaging==25.0                       # 一个用于处理 Python 软件包版本和元数据的核心工具 | Core utilities for handling Python package versions and metadata.
+pyparsing==3.2.5                      # 一个用于生成解析器的通用框架 | A general framework for generating parsers.
+
+# [其他工具与数学 | Other Tools & Mathematics]
+sympy==1.14.0                         # 一个用于符号数学的 Python 库 | A Python library for symbolic mathematics.
+mpmath==1.3.0                         # 一个用于任意精度实数和复数浮点运算的库 | A library for arbitrary-precision floating-point arithmetic.
+networkx==3.5                         # 用于创建、操作和研究复杂网络结构的库 | A library for creating, manipulating, and studying complex networks.
+jieba==0.42.1                         # 一个用于中文文本分词的 Python 库 | A Python library for Chinese text segmentation.
+six==1.17.0                           # 一个提供工具来平滑 Python 2 和 3 之间差异的库 | A library providing utilities to smooth over differences between Python 2 and 3.
+
+# ================================================================
+# 说明结束 | End of Descriptions
+# ================================================================
