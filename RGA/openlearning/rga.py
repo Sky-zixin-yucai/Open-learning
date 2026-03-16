@@ -158,7 +158,7 @@ class RuleGovernedArchitecture(nn.Module):
         self.output_projection = nn.Linear(self.config.dim, self.config.vocab_size)
  
         # 核心公式验证器
-        self.metrics_calculator = CoreMetricsCalculator()
+        self.metrics_calculator = CoreMetricsCalculator(self.config)
 
         # 状态跟踪
         self.phase_state = "初始阶段"
