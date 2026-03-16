@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel>=0.37.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openlearning"
+version = "0.0.9"
+description = "Rule-Governed Architecture (RGA) – a novel neural framework with geological memory and phase transition"
+readme = "README.md"
+authors = [
+    {name = "Open-learning Team", email = "skyzixinyucai@126.com"}
+]
+license = {text = "Apache-2.0"}
+requires-python = ">=3.8"
+keywords = ["deep learning", "RGA", "geological memory", "phase transition", "PyTorch"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=1.9.0",          # 代码中使用了 torch.nn, torch.nn.functional 等
+    "numpy>=1.19.0",          # 代码中使用了 numpy
+    "jieba>=0.42.1",          # rga.py 中用于中文分词
+    "tqdm>=4.64.0",           # rga.py 和 zixin.py 中用于进度条
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "isort>=5.0.0",
+]
+doc = [
+    "sphinx>=5.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Sky-zixin-yucai/Open-learning"      # 请替换为实际地址
+Repository = "https://github.com/Sky-zixin-yucai/Open-learning.git"
+BugTracker = "https://github.com/Sky-zixin-yucai/Open-learning/issues"
+
+[project.scripts]
+openlearning = "openlearning.cli:main"    # 命令行入口
+
+[tool.setuptools.packages.find]
+include = ["openlearning*"]                # 自动发现 openlearning 包及其子模块
