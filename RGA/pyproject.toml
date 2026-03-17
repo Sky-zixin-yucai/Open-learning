@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0", "wheel>=0.37.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "openlearning"
-version = "0.0.9"
+name = "openboat"
+version = "0.0.1"
 description = "Rule-Governed Architecture (RGA) – a novel neural framework with geological memory and phase transition"
 readme = "README.md"
 authors = [
@@ -26,10 +26,10 @@ classifiers = [
 ]
 
 dependencies = [
-    "torch>=1.9.0",          # 代码中使用了 torch.nn, torch.nn.functional 等
-    "numpy>=1.19.0",          # 代码中使用了 numpy
-    "jieba>=0.42.1",          # rga.py 中用于中文分词
-    "tqdm>=4.64.0",           # rga.py 和 zixin.py 中用于进度条
+    "torch>=1.9.0",
+    "numpy>=1.19.0",
+    "jieba>=0.42.1",
+    "tqdm>=4.64.0",
 ]
 
 [project.optional-dependencies]
@@ -44,12 +44,12 @@ doc = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Sky-zixin-yucai/Open-learning"      # 请替换为实际地址
+Homepage = "https://github.com/Sky-zixin-yucai/Open-learning"
 Repository = "https://github.com/Sky-zixin-yucai/Open-learning.git"
 BugTracker = "https://github.com/Sky-zixin-yucai/Open-learning/issues"
 
 [project.scripts]
-openlearning = "openlearning.cli:main"    # 命令行入口
+openboat = "openboat.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["openlearning*"]                # 自动发现 openlearning 包及其子模块
+include = ["openboat*"]

@@ -9,12 +9,12 @@ import torch
 import numpy as np
 
 # ==================== 1. 导入 RGA 组件 ====================
-from openlearning.rga import (
+from openboat.rga import (
     AdvancedConstrainedArchitectureTrainer,
     RuleGovernedArchitecture,
     SmartTextDataset
 )
-from openlearning.config import RGAConfig
+from openboat.config import RGAConfig
 
 # ==================== 2. 生成模拟训练数据 ====================
 # 为了演示，我们创建一个简单的 LCCC 格式 JSON 文件

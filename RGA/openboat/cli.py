@@ -16,9 +16,9 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from openlearning import __version__
-    from openlearning.rga import AdvancedConstrainedArchitectureTrainer
-    from openlearning.zixin import test_complete_architecture
+    from openboat import __version__
+    from openboat.rga import AdvancedConstrainedArchitectureTrainer
+    from openboat.zixin import test_complete_architecture
 except ImportError as e:
     print(f"错误: 无法导入 openlearning 模块: {e}")
     print("请确保已正确安装 openlearning 包或在 PYTHONPATH 中包含项目根目录。")

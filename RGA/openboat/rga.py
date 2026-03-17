@@ -33,7 +33,7 @@ sys.path.append(parent_dir)
 
 # ========== 尝试导入模块 ==========
 try:
-    from openlearning import (
+    from openboat import (
         RGAConfig,
         VRegularizationParams,
         CoreMetricsCalculator,
@@ -2245,3 +2245,532 @@ __all__ = {
     'VisualTrainingProgress',
     'AdvancedConstrainedArchitectureTrainer',
 }
+
+# ==================== 完整训练实例函数 ====================
+
+def train_zixin_complete_model():
+    """
+    紫心RGA完整训练流程 - 优化配置版
+    """
+    
+    # ==================== 核心配置 ====================
+    config = {
+        # ==================== 数据配置 ====================
+        'data_path': "/mnt/e/新GPT训练数据/LCCC-base_train.json",
+        'output_dir': "/mnt/e/新GPT训练数据/LCCC-紫",
+        
+        # ==================== 架构配置 ====================
+        # 根据架构核心要求：3个单元、3层地质记忆、3种处理顺序
+        'vocab_size': 20000,          # 词汇表大小（根据数据集实际调整）
+        'seq_length': 100,            # 训练序列长度
+        'embed_dim': 128,             # 模型维度（必须为偶数）
+        'hidden_dim': 128,            # 隐藏维度（与embed_dim相同）
+        'marker_dim': 32,             # 标记向量维度
+        'max_seq_len': 512,           # 最大序列长度
+        'dropout_rate': 0.1,          # Dropout比率
+        
+        # ==================== 训练配置 ====================
+        'batch_size': 4,             # 批次大小（根据GPU内存调整）
+        'learning_rate': 3e-5,        # 学习率（使用较小的学习率）
+        'num_epochs': 1,             # 训练轮次（建议至少50轮）
+        'weight_decay': 1e-4,         # 权重衰减
+        'grad_clip': 1.0,             # 梯度裁剪阈值
+        'max_samples': 50000,        # 最大样本数（0表示无限制）
+        
+        # ==================== 架构保护配置 ====================
+        # 这些参数保护架构的数学基础和物理意义
+        'architecture_protection': {
+            'num_units': 3,           # 必须为3（三个链式反应单元）
+            'geo_depth': 3,           # 必须为3（三层地质记忆）
+            'time_layers': 3,         # 必须为3（三个时间层）
+            'v_subvalues': 3,         # 必须为3（每个单元三个V子值）
+            
+            # 处理顺序（严格保持）
+            'processing_orders': [
+                'V→K→Q',  # 子网络1
+                'Q→V→K',  # 子网络2
+                'K→Q→V',  # 子网络3
+            ],
+            
+            # 数学基础参数
+            'connection_threshold': 0.3,   # 连接点密度公式阈值
+            'phase_threshold': 0.83,       # 相变检测阈值
+            'density_method': 'static',    # 密度计算方法
+            
+            # V值调控（保护数值稳定性）
+            'target_V_mean': 1.0,
+            'max_V_mean': 2.0,
+            'min_V_mean': 0.3,
+            
+            # 三明治融合权重（固定）
+            'sandwich_weights': {
+                'Q': [0.5, 0.3, 0.2],  # [深层, 当前, 原始]
+                'K': [0.5, 0.3, 0.2],
+                'V': [0.6, 0.3, 0.1],  # V权重不同，体现主导性
+            },
+        },
+        
+        # ==================== 优化配置 ====================
+        'optimization': {
+            'mixed_precision': True,      # 启用混合精度训练
+            'gradient_accumulation_steps': 4,  # 梯度累积步数
+            'use_gradient_checkpointing': True,  # 使用梯度检查点
+            'scheduler_type': 'cosine',   # 学习率调度器类型
+            'warmup_steps': 2000,         # 预热步数
+            'min_learning_rate': 1e-6,    # 最小学习率
+            
+            # CUDA优化
+            'cudnn_benchmark': True,
+            'tf32_enabled': True,
+        },
+        
+        # ==================== 监控配置 ====================
+        'monitoring': {
+            'V_health_history_length': 100,  # V值健康历史长度
+            'progress_bar_width': 50,        # 进度条宽度
+            'save_checkpoint_every': 1,      # 每epoch保存检查点
+            'keep_best_models': 3,           # 保留最佳模型数量
+            'save_pretrained_format': True,  # 保存为标准格式
+        },
+        
+        # ==================== 设备配置 ====================
+        'device': 'cuda' if torch.cuda.is_available() else 'cpu',
+    }
+    
+    print("="*80)
+    print("紫心RGA完整训练 - 优化配置")
+    print("="*80)
+    
+    # 打印配置摘要
+    print("\n📋 配置摘要:")
+    print(f"  数据路径: {config['data_path']}")
+    print(f"  输出目录: {config['output_dir']}")
+    print(f"  词汇表大小: {config['vocab_size']:,}")
+    print(f"  模型维度: {config['embed_dim']} (必须为偶数: {'✅' if config['embed_dim'] % 2 == 0 else '❌'})")
+    print(f"  序列长度: {config['seq_length']}")
+    print(f"  训练轮次: {config['num_epochs']}")
+    print(f"  批次大小: {config['batch_size']}")
+    print(f"  学习率: {config['learning_rate']}")
+    
+    # 打印架构保护配置
+    protection = config['architecture_protection']
+    print(f"\n🔒 架构保护:")
+    print(f"  链式反应单元: {protection['num_units']}个")
+    print(f"  地质记忆深度: {protection['geo_depth']}层")
+    print(f"  时间层: {protection['time_layers']}个")
+    print(f"  V子值: {protection['v_subvalues']}个/单元")
+    print(f"  连接阈值: {protection['connection_threshold']}")
+    print(f"  相变阈值: {protection['phase_threshold']}")
+    
+    # 验证关键参数
+    if config['embed_dim'] % 2 != 0:
+        print(f"\n⚠️ 警告: embed_dim 必须是偶数，当前为 {config['embed_dim']}")
+        config['embed_dim'] = 512
+        print(f"✅ 已调整为: {config['embed_dim']}")
+    
+    # 验证三明治融合权重
+    q_sum = sum(protection['sandwich_weights']['Q'])
+    k_sum = sum(protection['sandwich_weights']['K'])
+    v_sum = sum(protection['sandwich_weights']['V'])
+    
+    if abs(q_sum - 1.0) > 1e-6:
+        print(f"⚠️ 警告: Q权重和不为1，当前为{q_sum}")
+    if abs(k_sum - 1.0) > 1e-6:
+        print(f"⚠️ 警告: K权重和不为1，当前为{k_sum}")
+    if abs(v_sum - 1.0) > 1e-6:
+        print(f"⚠️ 警告: V权重和不为1，当前为{v_sum}")
+    
+    # 创建训练器
+    trainer = AdvancedConstrainedArchitectureTrainer(config)
+    
+    try:
+        # 开始训练
+        model, history = trainer.train()
+        
+        # 训练完成后显示最终统计
+        print("\n" + "="*80)
+        print("训练完成，最终统计")
+        print("="*80)
+        
+        if history['train_loss']:
+            final_train = history['train_loss'][-1]
+            print(f"最终训练损失: {final_train:.4f}")
+        
+        if history['val_loss']:
+            final_val = history['val_loss'][-1]
+            print(f"最终验证损失: {final_val:.4f}")
+        
+        print(f"最佳验证损失: {history['best_val_loss']:.4f}")
+        
+        # 显示V值统计
+        if history['metrics']:
+            last_metrics = history['metrics'][-1]
+            if 'v_mean' in last_metrics:
+                print(f"最终V值: {last_metrics['v_mean']:.4f}")
+            
+            # 计算训练总时间
+            total_train_time = sum([m.get('train_time', 0) for m in history['metrics']])
+            total_val_time = sum([m.get('val_time', 0) for m in history['metrics']])
+            print(f"总训练时间: {total_train_time:.1f}s")
+            print(f"总验证时间: {total_val_time:.1f}s")
+            print(f"总时间: {total_train_time + total_val_time:.1f}s")
+        
+        print(f"\n模型检查点保存在: {config['output_dir']}")
+        print(f"最佳模型: {os.path.join(config['output_dir'], 'best_model.pth')}")
+        print(f"最终模型: {os.path.join(config['output_dir'], 'final_model.pth')}")
+        
+        return model, history
+        
+    except Exception as e:
+        print(f"❌ 训练过程中出错: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
+    
+# ==================== 快速测试模式 ====================
+
+def quick_test_mode():
+    """
+    快速测试模式 - 用于验证模型是否正常工作
+    """
+    print("🚀 启动快速测试模式")
+    print("-"*40)
+    
+    # 小规模配置
+    config = {
+        'data_path': "/mnt/e/新GPT训练数据/LCCC-base_train.json",  # 小样本数据
+        'output_dir': "/mnt/e/新GPT训练数据/紫心回应",
+        'vocab_size': 5000,
+        'seq_length': 32,
+        'embed_dim': 128,
+        'hidden_dim': 128,
+        'marker_dim': 16,
+        'batch_size': 3,
+        'learning_rate': 1e-4,
+        'num_epochs': 2,
+        'max_samples': 1000,
+        'device': 'cuda' if torch.cuda.is_available() else 'cpu'
+    }
+    
+    # 创建训练器
+    trainer = AdvancedConstrainedArchitectureTrainer(config)
+    
+    try:
+        model, history = trainer.train()
+        print("\n✅ 快速测试完成")
+        return True
+    except Exception as e:
+        print(f"❌ 快速测试失败: {e}")
+        return False
+
+
+# ==================== 恢复训练模式 ====================
+
+def resume_training(checkpoint_dir, additional_epochs=10):
+    """
+    从现有检查点恢复训练
+    
+    Args:
+        checkpoint_dir: 检查点目录
+        additional_epochs: 额外训练的轮次
+    """
+    print(f"🔄 从检查点恢复训练: {checkpoint_dir}")
+    
+    # 查找最新的检查点文件
+    checkpoint_files = [f for f in os.listdir(checkpoint_dir) if f.endswith('.pth')]
+    if not checkpoint_files:
+        print(f"❌ 在 {checkpoint_dir} 中找不到检查点文件")
+        return None, None
+    
+    # 找到最新的检查点（按epoch编号）
+    epoch_checkpoints = [f for f in checkpoint_files if 'checkpoint_epoch' in f]
+    if epoch_checkpoints:
+        # 按epoch编号排序
+        epoch_checkpoints.sort(key=lambda x: int(x.split('_')[-1].split('.')[0]) if 'epoch' in x else 0, reverse=True)
+        checkpoint_path = os.path.join(checkpoint_dir, epoch_checkpoints[0])
+    else:
+        # 如果没有epoch检查点，尝试加载最终模型
+        if 'final_model.pth' in checkpoint_files:
+            checkpoint_path = os.path.join(checkpoint_dir, 'final_model.pth')
+        elif 'best_model.pth' in checkpoint_files:
+            checkpoint_path = os.path.join(checkpoint_dir, 'best_model.pth')
+        else:
+            print(f"❌ 找不到有效的检查点文件")
+            return None, None
+    
+    try:
+        # 加载检查点
+        checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+        config = checkpoint['config']
+        
+        # 更新配置
+        config['output_dir'] = checkpoint_dir
+        config['num_epochs'] = checkpoint.get('epoch', 0) + additional_epochs
+        
+        print(f"✓ 加载检查点: {os.path.basename(checkpoint_path)}")
+        print(f"✓ 原训练轮次: {checkpoint.get('epoch', 0)}")
+        print(f"✓ 新增训练轮次: {additional_epochs}")
+        print(f"✓ 总训练轮次: {config['num_epochs']}")
+        
+        # 创建训练器
+        trainer = AdvancedConstrainedArchitectureTrainer(config)
+        
+        # 手动设置历史记录，以便继续训练
+        trainer.history = checkpoint.get('history', trainer.history)
+        
+        # 开始训练（训练器会自动加载最新的检查点）
+        model, history = trainer.train()
+        print("\n✅ 恢复训练完成")
+        return model, history
+    except Exception as e:
+        print(f"❌ 恢复训练失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
+
+
+# ==================== 推理测试 ====================
+
+def test_model_inference(model_path, test_text, max_length=50):
+    """
+    测试训练好的模型进行推理
+    
+    Args:
+        model_path: 模型路径
+        test_text: 测试文本
+        max_length: 生成的最大长度
+    """
+    print(f"🧪 测试模型推理: {model_path}")
+    
+    # 加载模型
+    checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
+    config_dict = checkpoint['config']
+    
+    # 创建RGAConfig
+    rga_config = RGAConfig()
+    rga_config.vocab_size = config_dict.get('vocab_size', 50000)
+    rga_config.dim = config_dict.get('embed_dim', 512)
+    rga_config.num_units = 3  # 默认链式反应单元数量
+    
+    # 创建模型
+    model = RuleGovernedArchitecture(config=rga_config)
+    
+    # 加载权重
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.eval()
+    
+    print(f"模型配置: {rga_config.__dict__}")
+    print(f"测试文本: {test_text}")
+    
+    # 简单的编码（实际使用时需要更复杂的编码）
+    # 这里我们使用一个简单的空格分词
+    tokens = test_text.split()
+    input_ids = [hash(token) % rga_config.vocab_size for token in tokens]
+    
+    # 限制序列长度
+    if len(input_ids) > 128:
+        input_ids = input_ids[:128]
+    elif len(input_ids) < 128:
+        input_ids = input_ids + [0] * (128 - len(input_ids))
+    
+    input_tensor = torch.tensor([input_ids], dtype=torch.long)
+    
+    # 生成文本
+    print("\n生成结果:")
+    with torch.no_grad():
+        for i in range(max_length):
+            outputs = model(input_tensor, num_cycles=1)
+            logits = outputs['logits'][:, -1, :]  # 取最后一个token的logits
+            next_token = torch.argmax(logits, dim=-1).item()
+            
+            # 简单的解码（实际使用时需要解码器）
+            input_tensor = torch.cat([
+                input_tensor, 
+                torch.tensor([[next_token]], dtype=torch.long)
+            ], dim=1)
+            
+            if next_token == 0:  # 结束标记
+                break
+            
+            # 打印生成的token（简单演示）
+            if i < max_length - 1:
+                print(f"[token {i+1}: {next_token}]", end=" ")
+    
+    print("\n... 推理完成")
+
+
+# ==================== 主程序入口 ====================
+
+def main():
+    """
+    主程序入口
+    """
+    print("\n" + "="*80)
+    print("紫心RGA模型系统")
+    print("="*80)
+    print("选择模式:")
+    print("1. 完整训练模式")
+    print("2. 快速测试模式")
+    print("3. 恢复训练模式")
+    print("4. 测试模型推理")
+    print("5. 运行架构测试")
+    print("0. 退出")
+    
+    try:
+        choice = input("\n请选择模式 (0-5): ").strip()
+        
+        if choice == '1':
+            # 完整训练
+            print("\n📚 启动完整训练模式")
+            print("注意: 这可能需要较长时间和大量计算资源")
+            
+            # 检查数据文件
+            data_path = input("输入训练数据路径 [data/train.txt]: ").strip()
+            if not data_path:
+                data_path = 'data/train.txt'
+            
+            if not os.path.exists(data_path):
+                print(f"❌ 数据文件不存在: {data_path}")
+                print("请确保数据文件存在或提供正确的路径")
+                return
+            
+            model, history = train_zixin_complete_model()
+            
+        elif choice == '2':
+            # 快速测试
+            print("\n⚡ 启动快速测试模式")
+            success = quick_test_mode()
+            if success:
+                print("✅ 模型测试通过")
+            else:
+                print("❌ 模型测试失败")
+                
+        elif choice == '3':
+            # 恢复训练
+            print("\n🔄 启动恢复训练模式")
+            checkpoint_dir = input("输入检查点目录 [zixin_rga_checkpoints]: ").strip()
+            if not checkpoint_dir:
+                checkpoint_dir = 'zixin_rga_checkpoints'
+            
+            if not os.path.exists(checkpoint_dir):
+                print(f"❌ 检查点目录不存在: {checkpoint_dir}")
+                return
+            
+            additional_epochs = input("输入额外训练轮次 [10]: ").strip()
+            additional_epochs = int(additional_epochs) if additional_epochs else 10
+            
+            model, history = resume_training(checkpoint_dir, additional_epochs)
+            
+        elif choice == '4':
+            # 测试推理
+            print("\n🧪 启动推理测试模式")
+            model_path = input("输入模型路径 [zixin_rga_checkpoints/best_model.pth]: ").strip()
+            if not model_path:
+                model_path = 'zixin_rga_checkpoints/best_model.pth'
+            
+            if not os.path.exists(model_path):
+                print(f"❌ 模型文件不存在: {model_path}")
+                return
+            
+            test_text = input("输入测试文本 [今天天气不错]: ").strip()
+            if not test_text:
+                test_text = "今天天气不错"
+            
+            test_model_inference(model_path, test_text)
+            
+        elif choice == '5':
+            # 运行架构测试
+            print("\n🔧 运行架构完整性测试")
+            try:
+                test_complete_architecture()
+            except Exception as e:
+                print(f"架构测试失败: {e}")
+                
+        elif choice == '0':
+            print("👋 退出程序")
+            return
+            
+        else:
+            print("❌ 无效选择")
+            
+    except KeyboardInterrupt:
+        print("\n\n⚠️ 用户中断操作")
+    except Exception as e:
+        print(f"\n❌ 程序运行出错: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+# ==================== 命令行接口 ====================
+
+def cli():
+    """
+    命令行接口
+    """
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='紫心RGA模型训练系统')
+    parser.add_argument('--mode', type=str, default='train', 
+                       choices=['train', 'test', 'resume', 'infer', 'demo'],
+                       help='运行模式: train(训练), test(测试), resume(恢复), infer(推理), demo(演示)')
+    parser.add_argument('--data', type=str, default='data/train.txt', 
+                       help='训练数据路径')
+    parser.add_argument('--checkpoint', type=str, default='zixin_rga_checkpoints',
+                       help='检查点目录')
+    parser.add_argument('--epochs', type=int, default=20,
+                       help='训练轮次')
+    parser.add_argument('--batch-size', type=int, default=16,
+                       help='批次大小')
+    parser.add_argument('--embed-dim', type=int, default=512,
+                       help='嵌入维度')
+    
+    args = parser.parse_args()
+    
+    if args.mode == 'train':
+        config = {
+            'data_path': args.data,
+            'output_dir': args.checkpoint,
+            'vocab_size': 50000,
+            'seq_length': 128,
+            'embed_dim': args.embed_dim,
+            'hidden_dim': args.embed_dim,
+            'marker_dim': 32,
+            'batch_size': args.batch_size,
+            'learning_rate': 1e-4,
+            'num_epochs': args.epochs,
+            'device': 'cuda' if torch.cuda.is_available() else 'cpu'
+        }
+        
+        trainer = AdvancedConstrainedArchitectureTrainer(config)
+        trainer.train()
+        
+    elif args.mode == 'test':
+        quick_test_mode()
+        
+    elif args.mode == 'resume':
+        resume_training(args.checkpoint, 10)
+        
+    elif args.mode == 'infer':
+        model_path = os.path.join(args.checkpoint, 'best_model.pth')
+        if not os.path.exists(model_path):
+            print(f"❌ 模型文件不存在: {model_path}")
+            return
+        test_model_inference(model_path, "今天天气不错")
+        
+    elif args.mode == 'demo':
+        # 运行演示
+        test_complete_architecture()
+
+
+# ==================== 程序入口 ====================
+
+if __name__ == "__main__":
+    # 检查是否通过命令行参数运行
+    import sys
+    
+    if len(sys.argv) > 1:
+        # 命令行模式
+        cli()
+    else:
+        # 交互模式
+        main()

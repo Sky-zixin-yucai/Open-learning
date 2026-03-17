@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple, Optional, Any, Union, Callable
 import numpy as np
 import warnings
 
-__version__ = "0.0.9"
+__version__ = "0.0.1"
 __author__ = "Open-learning Team"
 
 try:

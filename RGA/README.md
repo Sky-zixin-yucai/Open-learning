@@ -1,11 +1,11 @@
-# OpenLearning – 规则治理架构 (RGA)
+# OpenBoat – 规则治理架构 (RGA)
 
-[![PyPI version](https://img.shields.io/pypi/v/openlearning.svg)](https://pypi.org/project/openlearning/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/openlearning.svg)](https://pypi.org/project/openlearning/)
-[![License](https://img.shields.io/pypi/l/openlearning.svg)](https://github.com/your-org/openlearning/blob/main/LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/openboat.svg)](https://pypi.org/project/openboat/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/openboat.svg)](https://pypi.org/project/openboat/)
+[![License](https://img.shields.io/pypi/l/openboat.svg)](https://github.com/Sky-zixin-yucai/Open-learning/blob/main/LICENSE)
 [![PyTorch](https://img.shields.io/badge/PyTorch-1.9+-ee4c2c?logo=pytorch)](https://pytorch.org)
 
-**OpenLearning** 是**规则治理架构 (RGA)** 的官方实现，一个创新的神经网络框架，其核心设计基于 **三值（Q, K, V）动态平衡** 与 **地质记忆** 机制，旨在模拟认知过程中的**相变**、**持续思考**和**长期记忆**。
+**OpenBoat** 是**规则治理架构 (RGA)** 的官方实现。RGA 是一个创新的神经网络框架，其核心设计基于 **三值（Q, K, V）动态平衡** 与 **地质记忆** 机制，旨在模拟认知过程中的**相变**、**持续思考**和**长期记忆**。
 
 ---
 
@@ -18,6 +18,7 @@
 - **单向阀**：精确控制信息流，保护核心记忆。
 - **三明治融合**：将深层地质记忆、当前状态与原始输入加权融合，实现持续学习。
 - **伪装保存**：支持将模型保存为标准Transformer格式（如BERT），便于集成到现有Pipeline。
+- **命令行接口**：提供 `openboat` 命令，一键训练、测试和查看环境信息。
 
 ---
 
@@ -25,57 +26,73 @@
 
 ### 从 PyPI 安装（推荐）
 ```bash
-pip install openlearning
+pip install openboat
 ```
 
 ### 从源码安装
 ```bash
 git clone https://github.com/Sky-zixin-yucai/Open-learning.git
-cd openlearning
+cd Open-learning
 pip install .
 ```
 
 ### 安装开发版本（包含测试与格式化工具）
 ```bash
-pip install openlearning[dev]
+pip install openboat[dev]
 ```
 
 ---
 
 ## 🚀 快速开始
 
-### 训练一个语言模型
-
-```python
-from openlearning.rga import AdvancedConstrainedArchitectureTrainer
-
-config = {
-    'data_path': 'path/to/your/data.json',   # LCCC格式的对话数据
-    'output_dir': './rga_output',
-    'seq_length': 128,
-    'batch_size': 16,
-    'embed_dim': 256,
-    'learning_rate': 1e-4,
-    'num_epochs': 10,
-    'device': 'cuda' if torch.cuda.is_available() else 'cpu'
-}
-
-trainer = AdvancedConstrainedArchitectureTrainer(config)
-model, history = trainer.train()
+### 1. 准备数据（LCCC格式）
+```json
+[
+  ["你好", "你好呀！"],
+  ["今天天气怎么样？", "晴天", "适合出去玩"]
+]
 ```
 
-### 使用预训练模型推理
+### 2. 训练模型
+```bash
+openboat train --data_path ./data.json --output_dir ./rga_output
+```
 
+您也可以使用配置文件：
+```bash
+openboat train --config ./config.json
+```
+
+配置文件示例 (`config.json`)：
+```json
+{
+    "data_path": "./data.json",
+    "output_dir": "./rga_output",
+    "seq_length": 128,
+    "batch_size": 32,
+    "embed_dim": 512,
+    "learning_rate": 3e-4,
+    "num_epochs": 20,
+    "device": "cuda"
+}
+```
+
+### 3. 运行测试
+```bash
+openboat test
+```
+
+### 4. 查看环境信息
+```bash
+openboat info
+```
+
+### 5. 在Python脚本中使用
 ```python
-from openlearning.rga import RuleGovernedArchitecture
+from openboat.rga import RuleGovernedArchitecture
 
-# 加载伪装为BERT的RGA模型
-model = RuleGovernedArchitecture.from_pretrained('./my_rga_model/pretrained_model')
-
-# 准备输入
-input_ids = torch.randint(0, 1000, (1, 32))  # 示例输入
-outputs = model(input_ids, num_cycles=1)
-logits = outputs['logits']
+model = RuleGovernedArchitecture.from_pretrained('./rga_output/pretrained_model')
+# ... 进行推理
 ```
 
 ---
@@ -90,6 +107,7 @@ logits = outputs['logits']
 | `valve.py`        | `ChainReactionUnit_Final`       | 链式反应单元（含固定RMSNorm） |
 | `rga.py`          | `RuleGovernedArchitecture`, `SmartTextDataset`, `AdvancedConstrainedArchitectureTrainer` | 主架构、数据集与训练器 |
 | `zixin.py`        | `test_complete_architecture`     | 完整架构测试与演示            |
+| `cli.py`          | `main`                           | 命令行入口                    |
 
 ---
 
@@ -111,26 +129,17 @@ logits = outputs['logits']
 
 ```python
 # 保存为BERT兼容格式
-model.save_pretrained('./my_rga_model')
+model.save_pretrained('./my_boat_model')
 
 # 从BERT兼容格式加载
-model = RuleGovernedArchitecture.from_pretrained('./my_rga_model')
+model = RuleGovernedArchitecture.from_pretrained('./my_boat_model')
 ```
 
 ---
 
 ## 📝 数据格式说明
 
-`SmartTextDataset` 默认支持 LCCC 格式的 JSON 文件：
-
-```json
-[
-  ["你好", "你好呀！"],
-  ["今天天气怎么样？", "晴天", "适合出去玩"]
-]
-```
-
-数据集会自动检测文本类型（字符级/词级）并构建词汇表。
+`SmartTextDataset` 默认支持 LCCC 格式的 JSON 文件，即包含多个对话的列表，每个对话是一个字符串列表。数据集会自动检测文本类型（字符级/词级）并构建词汇表。
 
 ---
 
@@ -160,6 +169,5 @@ model = RuleGovernedArchitecture.from_pretrained('./my_rga_model')
 - **邮箱**：[skyzixinyucai@126.com](mailto:skyzixinyucai@126.com)
 - **项目主页**：[GitHub](https://github.com/Sky-zixin-yucai/Open-learning)
 
-**🎉 祝您使用 RGA 探索认知智能的新边界！**
-
----
+**🎉 祝您使用 OpenBoat 探索认知智能的新边界！**
+```
