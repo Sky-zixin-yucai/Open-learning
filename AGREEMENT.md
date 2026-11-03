@@ -6,11 +6,11 @@ When you submit code to this project, you agree to the following terms:
 
 ## 1. 版权与授权 / Copyright and License
 1. 你拥有提交代码的合法权利，或有权按本协议授权
-2. 你授权本项目以Apache 2.0许可证使用你的代码
+2. 你授权本项目以MPL 2.0许可证使用你的代码
 3. 你授予项目维护者永久的、全球性的、非独占性的版权许可
 
 1. You have the legal rights to the submitted code, or are authorized to grant licenses under this agreement
-2. You authorize this project to use your code under the Apache 2.0 license
+2. You authorize this project to use your code under the MPL 2.0 license
 3. You grant project maintainers perpetual, worldwide, non-exclusive copyright license
 
 ## 2. 保证与责任 / Warranties and Liabilities
