@@ -122,8 +122,8 @@ Specific authorities include:
 If you are subjected to or witness unacceptable behavior, or feel uncomfortable about certain conduct, please contact the project maintainer team immediately through the following channels. We encourage early reporting so we can provide timely support.
 
 **主要举报渠道 / Primary Reporting Channel**
-- 发送邮件至行为准则专用邮箱：**`skyzixinyucai@126.com`**
-- Email the Code of Conduct dedicated mailbox: **`skyzixinyucai@126.com`**
+- 发送邮件至行为准则专用邮箱：**`open@mrhua.cn`**
+- Email the Code of Conduct dedicated mailbox: **`open@mrhua.cn`**
 
 **备用联系途径 / Alternate Contact**（如主邮箱无法访问时）
 - 通过 GitHub Issues 联系维护者团队，标题请注明“Code of Conduct - Private”

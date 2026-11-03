@@ -1,14 +1,17 @@
-# ==================== 编译文件 ====================
+# ============================================================
+# Open-learning .gitignore
+# ============================================================
+
+# ----- Python -----
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-*.dylib
-
-# ==================== Python包 ====================
-*.egg-info/
-dist/
+.Python
 build/
+develop-eggs/
+dist/
+downloads/
 eggs/
 .eggs/
 lib/
@@ -17,86 +20,135 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
+*.egg-info/
+.installed.cfg
 *.egg
+pip-log.txt
+pip-delete-this-directory.txt
 
-# ==================== 虚拟环境 ====================
+# ----- 虚拟环境 -----
+.venv/
 venv/
 env/
 ENV/
-<<<<<<< HEAD
-myenv/
-=======
->>>>>>> origin/main
 env.bak/
 venv.bak/
-pythonenv*
 
-# ==================== 编辑器文件 ====================
-.vscode/
+# ----- 测试与覆盖率 -----
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# ----- 打包构建 -----
+*.spec
+build_windows/
+build_linux/
+build_macos/
+*.exe
+*.app
+*.dmg
+*.deb
+*.rpm
+
+# ----- IDE / 编辑器 -----
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
 *~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
 
-# ==================== Jupyter笔记本 ====================
-.ipynb_checkpoints
-*.ipynb
+# ----- 系统文件 -----
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
 
-# ==================== 日志文件 ====================
-logs/
+# ----- 日志 -----
 *.log
+logs/
 *.log.*
 
-# ==================== 模型检查点 ====================
-*.pth
-*.pt
-*.bin
-*.ckpt
-*.safetensors
-
-# ==================== 数据集 ====================
-data/
-*.h5
-*.hdf5
-*.npz
-*.npy
-*.pkl
-*.pickle
-
-# ==================== 临时文件 ====================
+# ----- 临时/缓存文件 -----
 *.tmp
 *.temp
-.DS_Store
-Thumbs.db
+*.bak
+*.cache
+*.old
+*.orig
+*.rej
+.tmp/
+temp/
+.cache/
 
-# ==================== 配置文件 ====================
-*.cfg
-*.ini
+# ----- 环境变量 / 密钥 -----
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*.p12
+secrets.yaml
+config.local.yaml
 
-# ==================== 测试相关 ====================
-.coverage
-htmlcov/
-.pytest_cache/
-.tox/
-
-# ==================== 文档生成 ====================
-docs/_build/
-docs/source/_build/
-_build/
-
-# ==================== 操作系统文件 ====================
+# ----- 数据库 -----
 *.db
+*.sqlite
 *.sqlite3
+*.db-journal
 
-# ==================== 但保留重要的配置文件 ====================
-# !configs/model/*.yaml
-# !configs/training/*.yaml
+# ----- 模型与大文件（按需取消注释）-----
+# 下载的MMD/Live2D模型文件夹
+# orb_skins/downloaded-*/
+# assets/models/*.pmx
+# assets/models/*.vrm
+# assets/models/*.zip
 
-# ==================== 但保留重要的示例 ====================
-# !examples/basic/*.py
-# !examples/advanced/*.py
+# ----- 静态资源缓存 -----
+# static/cache/
+# static/uploads/
+# static/orb_skins/downloaded-*/
 
-# ==================== 但保留重要的脚本 ====================
-# !scripts/*.py
+# ----- 截图与导出 -----
+screenshots/
+exports/
+*.png
+!assets/**/*.png
+!static/**/*.png
+
+# ----- Node（如果有前端构建）-----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.pnpm-store/
+
+# ----- 其他 -----
+*.pid
+*.seed
+*.pid.lock
+.replit
+.vercel
+.netlify
