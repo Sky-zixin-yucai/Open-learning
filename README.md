@@ -13,7 +13,7 @@ Participating Documentation
 Open-learning Character
 --------------
 
-Currently, there is only one character: modules without maintainers
+Currently, there is only one character: modules without maintainers,
 
 C: modules without anyone managing them, open to everyone
 
